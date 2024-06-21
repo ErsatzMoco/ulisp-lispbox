@@ -4,7 +4,7 @@ Modified version of ulisp-arm (see below) for use with a self-contained uLisp co
 Contains several modifications to the ulisp-arm version (many based on the uLisp firmware for the LilyGO T-Deck)
 as well as a set of suitable uLisp extensions including RFM69 support and a Lisp library providing an extended ULOS system, the most important parts of a uLisp port of ErsatzMoco (github.com/ErsatzMoco/ErsatzMoco) and a full-screen uLisp and text editor.
 The editor features full SD card support, direct binding to uLisp symbols, full bracket matching and some keyboard shortcuts
-partially compatible to EMACS:
+partially compatible with EMACS:
 
 * CTRL-q / CTRL-c --- quit editor and return to REPL
 * CTRL-x / CTRL-b / CTRL-n --- discard current text buffer (i.e. new file)
