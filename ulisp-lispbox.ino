@@ -30,7 +30,7 @@
 
 // Includes
 
-#include "LispLibraryTeensy.h"
+#include "LispboxLibrary.h"
 #include <setjmp.h>
 #include <SPI.h>
 #include <Wire.h>
