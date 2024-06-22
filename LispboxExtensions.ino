@@ -1,5 +1,5 @@
 /*
-  Keyboard FeatherWing uLisp Extension - Version 0.3 - 14th March 2024
+  LispBox uLisp Extension - Version 1.0 - June 2024
 
   Based on:
   NeoPixel uLisp Extension - Version 1a - 22nd May 2023
