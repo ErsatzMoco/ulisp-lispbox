@@ -1,4 +1,4 @@
-# ulisp-teensy-lib
+# ulisp-lispbox
 Modified version of ulisp-arm (see below) for use with a self-contained uLisp computer based on the Teensy 4.1, a TFT screen with RA8875 controller and an USB keyboard. The REPL works locally and via serial connection simultaneously and prints to the TFT as well.
 
 Contains several modifications to the ulisp-arm version (many based on the uLisp firmware for the LilyGO T-Deck)
