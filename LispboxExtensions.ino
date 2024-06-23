@@ -1,9 +1,12 @@
 /*
   LispBox uLisp Extension - Version 1.0 - June 2024
+  Hartmut Grawe - github.com/ersatzmoco - June 2024
 
   Based on:
   NeoPixel uLisp Extension - Version 1a - 22nd May 2023
   See http://www.ulisp.com/show?4GMV
+
+  Licensed under the MIT license: https://opensource.org/licenses/MIT
 */
 
 // #define radiohead // Outcomment this to switch to LowPowerLab RFM69 library
@@ -212,6 +215,8 @@ object *fn_KeyboardFlush (object *args, object *env) {
   kb_pressed_m = 0;
   kb_released_k = 0;
   kb_released_m = 0;
+
+  return nil;
 }
 
 #if defined sdcardsupport
