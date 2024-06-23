@@ -1,3 +1,16 @@
+/*
+  LispBox LispLibrary - Version 1.0 - June 2024
+  Hartmut Grawe - github.com/ersatzmoco - June 2024
+
+  Some parts based on:
+  ErsatzMoco microcontroller framework - github.com/ersatzmoco/ersatzmoco
+  Hartmut Grawe - github.com/ersatzmoco - July 2020
+  Please see there for further explanations on how to use the framework.
+
+  This uLisp version licensed under the MIT license: https://opensource.org/licenses/MIT
+*/
+
+
 
     // MOCO-COMMANDS - not implemented as Lisp constants to save memory
     // following commentary sections just for reference - just use the decimal values and write code name into comment
@@ -55,8 +68,13 @@
     // EM_RMT_REMOTE_PULSE = 43          #!< RemoteAction: Switch off remote function
     // EM_RMT_SIGNAL_ACK = 44            #!< RemoteAction: Acknowledge signal
 
+
 const char LispLibrary[] PROGMEM = R"lisplibrary(
 
+;
+; Extended ULOS functions
+;
+;
 ; Define a class
 (defun class (&optional parent slots constructor)
   (let ((obj (when parent (list (cons 'parent parent)))))
@@ -104,9 +122,15 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
   )
 )
 
+; Call a method in an object instance
+;
+(defun cmt (obj method &rest arguments) 
+	(apply (eval (gtv obj method)) (append (list obj) arguments))
+)
+
 
 ;
-; Screen editor
+; LispBox screen editor
 ;
 ;
 (defun se:init (sk)
@@ -760,6 +784,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 				)
 				(setf se:buffer (reverse se:buffer))
 				(se:hide-cursor)
+				(se:map-brackets t)
 				(tft1-set-cursor (* 36 se:cwidth) 0)
 				(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:cursor_col '_to-16bit))
 				(setf se:filename fname)
@@ -1046,243 +1071,13 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	(read-from-string (eval (concatenate 'string aname (string anum))))
 )
 
-(defun cmt (obj method &rest arguments) 
-	(apply (eval (gtv obj method)) (append (list obj) arguments))
-)
-
-(defun create-de (type dp objname text fgc bgc bc szx szy gx gy &optional (st 2) (ts 2) (dr nil) (dt ""))
-	(cond
-		((= type 1)
-			(let* ((obj (eval (read-from-string (format nil "(defvar ~a (class 'label nil t))" objname)))))
-				(cmt obj '_init objname text)
-				(stv obj 'fg_color fgc)
-				(stv obj 'bg_color bgc)
-				(stv obj 'border_color bc)
-				(cmt obj '_set-display dp)
-				(cmt obj '_set-grid-size szx szy)
-				(cmt obj '_set-grid-coords gx gy)
-				(cmt obj '_set-stroke st)	
-				(cmt obj '_set-text-size ts)
-			))
-		((= type 2)
-			(let* ((obj (eval (read-from-string (format nil "(defvar ~a (class 'button nil t))" objname)))))
-				(cmt obj '_init objname text dt)
-				(stv obj 'fg_color fgc)
-				(stv obj 'bg_color bgc)
-				(stv obj 'border_color bc)
-				(cmt obj '_set-display dp)
-				(cmt obj '_set-grid-size szx szy)
-				(cmt obj '_set-grid-coords gx gy)
-				(cmt obj '_set-stroke st)	
-				(cmt obj '_set-text-size ts)
-			))
-	)
-)
-
-(defun test_bt (obj)
-	(touch-begin)
-	(loop 
-		(let* ((kb (keyboard-get-key)) (tp nil) (resp "")) 
-			(when (or kb (touch-touched))
-				(if (touch-touched)
-					(progn
-						(setq tp (touch-get-point))
-						(if (cmt obj '_coords-within tp)
-							(setq resp (concatenate 'string "in" (string tp)))
-							(setq resp tp)
-						)
-					)
-					(setq resp kb)
-				)
-				(force-tft)
-				(stv obj 'text (string resp))
-				(stv obj 'downtext (concatenate 'string (string resp) (string resp)))
-				(cmt obj '_toggle) 	
-				(cmt obj '_draw) 	
-				(delay 1000)
-				(cmt obj '_toggle)
-				(cmt obj '_draw)
-			) 
-		)
-	)
-)
-
-(defun setup (node net)
-	(defvar curmsg (class 'moco-message nil t))
-	(stv curmsg 'data "0")
-	(defvar curkey nil)
-	(defvar curloc 24)
-	(defvar curspd 0)
-	(defvar curminspd 50)
-	(defvar curmaxspd 210)
-
-	(defvar disp (class 'display nil t))
-	(cmt disp '_init)
-	(stv disp 'pix_max_x 320)
-	(stv disp 'pix_max_y 240)
-	(cmt 'disp '_set-grid-space (class 'shape-size '(width 5 height 5)))
-
-	(defvar orange1 (class 'color '(red #xFF green #x66 blue #x00)))
-	(defvar orange2 (class 'color '(red #xF2 green #xBD blue #x35)))
-	(defvar orange3 (class 'color '(red #xFF green #xCC blue #x00)))
-	(defvar orange4 (class 'color '(red #xFF green #xCC blue #x66)))
-
-	(defvar yellow1 (class 'color '(red #xFF green #xFF blue #x00)))
-	(defvar yellow2 (class 'color '(red #xFF green #xFF blue #x66)))
-
-	(defvar blue1 (class 'color '(red #x00 green #x00 blue #x66)))
-	(defvar blue2 (class 'color '(red #x99 green #x99 blue #xFF)))
-	(defvar blue3 (class 'color '(red #x33 green #xCC blue #xFF)))
-	(defvar blue4 (class 'color '(red #xCC green #xFF blue #xFF)))
-
-	(defvar green1 (class 'color '(red #x00 green #x99 blue #x00)))
-	(defvar green2 (class 'color '(red #x33 green #xCC blue #x00)))
-	(defvar green3 (class 'color '(red #x33 green #xFF blue #x33)))
-	(defvar green4 (class 'color '(red #x99 green #xFF blue #x99)))
-
-	(defvar red1 (class 'color '(red #xFF green #x00 blue #x00)))
-
-	(defvar white1 (class 'color '(red #xFF green #xFF blue #xFF)))
-	(defvar gray1 (class 'color '(red #x99 green #x99 blue #x99)))
-	(defvar gray2 (class 'color '(red #xCC green #xCC blue #xCC)))
 
 
-	(create-de 1 'disp "lok24" "FRZ" 'gray1 'gray2 'blue1 18 6 1 0 2 2)
-	(create-de 1 'disp "spd24" "0" 'gray1 'gray2 'blue1 18 6 20 0 2 2)
-	(create-de 1 'disp "left24" "<" 'white1 'gray2 'blue1 4 6 54 0 2 2)
-	(create-de 1 'disp "right24" ">" 'white1 'gray2 'blue1 4 6 59 0 2 2)
-
-	(create-de 2 'disp "min10" "-10" 'orange1 'orange4 'red1 12 6 0 42 2 2)
-	(create-de 2 'disp "min5" "-5" 'orange1 'orange2 'red1 12 6 13 42 2 2)
-	(create-de 2 'disp "pls5" "+5" 'green1 'green3 'green2 12 6 39 42 2 2)
-	(create-de 2 'disp "pls10" "+10" 'green1 'green4 'green2 12 6 52 42 2 2)
-
-	(create-de 2 'disp "stop" "STOP" 'white1 'red1 'orange3 12 3 26 45 2 2)
-
-	(rfm69-begin 23 23)
-	(force-tft)
-)
-
-(defun draw-all ()
-	(dolist (dpe (gtv disp 'buffer)) (cmt dpe '_draw))
-)
-
-(defun dec-loc-spd (dif)
-	(if (>= curspd (+ curminspd dif))
-		(progn 
-			(setq curspd (- curspd dif))
-			(stv curmsg 'command 3)
-			(stv curmsg 'data curspd)
-			(rfm69-send curloc (cmt curmsg '_to-string)) 
-			(display-spd curspd))
-		(progn 
-			(stv curmsg 'command 4)
-			(rfm69-send curloc (cmt curmsg '_to-string))
-			(delay 1500)
-			(setq curspd 0)
-			(display-spd curspd))
-	)
-)
-
-(defun inc-loc-spd (dif)
-	(when(<= curspd (- curmaxspd dif))
-		(setq curspd (+ curspd dif))
-		(stv curmsg 'command 3) 
-		(stv curmsg 'data curspd) 
-		(rfm69-send curloc (cmt curmsg '_to-string))
-		(display-spd curspd)
-	)
-)
-
-(defun deact-loc (myloc)
-	(stv (get-obj "spd" myloc) 'fg_color 'gray1)
-	(stv (get-obj "lok" myloc) 'bg_color 'gray2)
-	(stv (get-obj "lok" myloc) 'fg_color 'gray1)
-	(stv (get-obj "left" myloc) 'bg_color 'gray2)
-	(stv (get-obj "right" myloc) 'bg_color 'gray2)
-	(force-tft)
-	(draw-all)
-)
-
-(defun act-loc (myloc)
-	(stv (get-obj "spd" myloc) 'fg_color 'red1)
-	(stv (get-obj "lok" myloc) 'bg_color 'yellow1)
-	(stv (get-obj "lok" myloc) 'fg_color 'green1)
-	(force-tft)
-	(draw-all)
-)
-
-(defun display-spd (myspd)
-	(cmt (get-obj "spd" curloc) '_set-text myspd)
-	(force-tft)
-	(cmt (get-obj "spd" curloc) '_draw)
-)
-
-(defun main ()
-	(let* ((intval 40) (starttime (millis)))
-		(loop
-			(loop
-				(when (> (millis) (+ starttime intval)) (return))
-			)
-			(setq curkey (keyboard-get-key))
-			(when curkey
-				(cond 
-					((= curkey 6) (dec-loc-spd 10))
-					((= curkey 17) (dec-loc-spd 5))
-
-					((= curkey 7) (inc-loc-spd 5))
-					((= curkey 18) (inc-loc-spd 10))
-
-					((= curkey 2) 
-						(stv curmsg 'command 4)
-						(rfm69-send curloc (cmt curmsg '_to-string))
-						(delay 3000)
-						(setq curspd 0)
-						(display-spd curspd)
-						(deact-loc curloc)
-						)
-
-					((= curkey 3) 
-						(stv curmsg 'command 6)
-						(rfm69-send curloc (cmt curmsg '_to-string))
-						(stv (get-obj "left" curloc) 'bg_color 'green2)
-						(stv (get-obj "right" curloc) 'bg_color 'gray2)
-						(act-loc curloc)
-						)
-					((= curkey 4) 
-						(stv curmsg 'command 7)
-						(rfm69-send curloc (cmt curmsg '_to-string))
-						(stv (get-obj "left" curloc) 'bg_color 'gray2)
-						(stv (get-obj "right" curloc) 'bg_color 'green2)
-						(act-loc curloc)
-						)
-
-					((= curkey 32) 
-						(stv curmsg 'command 5)
-						(rfm69-send curloc (cmt curmsg '_to-string))
-						(delay 500)
-						(setq curspd 0)
-						(display-spd curspd)
-						(deact-loc curloc)
-						)
-				)
-
-				(setq curkey nil)
-			)
-			(setq starttime (millis))
-		)
-	)
-)
-
-(defun dispatch (msg)
-	(let* ((cmd (gtv msg 'command)) (data (gtv msg 'data)))
-		(cond
-			((= cmd 3) (print "cmd 3"))
-		)
-	)
-)
-
-
+;
+; ErsatzMoco framework functions
+; using extended ULOS 
+;
+;
 ; 
 ; class moco-message
 ;
