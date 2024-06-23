@@ -27,7 +27,7 @@ The editor is written in uLisp. To invoke it type
 
 (se:sedit)  or  (se:sedit 'symbol) where "symbol" can be any symbol name already present in uLisp
 
-
+![Editor screenshot](screenshot_editor.jpg)
 
 Based on ulisp-arm by David Johnson-Davies:
 # ulisp-arm
