@@ -2,7 +2,7 @@
 Modified version of ulisp-arm (see below) for use with a self-contained uLisp computer based on the Teensy 4.1, a TFT screen with RA8875 controller and an USB keyboard. The REPL works locally and via serial connection simultaneously and prints to the TFT as well.
 
 Contains several modifications to the ulisp-arm version (many based on the uLisp firmware for the LilyGO T-Deck)
-as well as a set of suitable uLisp extensions including RFM69 support and a Lisp library providing an extended ULOS system, the most important parts of a uLisp port of ErsatzMoco (github.com/ErsatzMoco/ErsatzMoco) and a full-screen uLisp and text editor.
+as well as a set of suitable uLisp extensions including RFM69 support and a Lisp library providing an extended ULOS system, the most important parts of a uLisp port of ErsatzMoco (github.com/ersatzmoco/ersatzmoco) and a full-screen uLisp and text editor.
 The editor features full SD card support, direct binding to uLisp symbols, full bracket matching and some keyboard shortcuts
 partially compatible with EMACS:
 
