@@ -19,7 +19,7 @@
 #define serialmonitor
 // #define printgcs
 #define sdcardsupport
-// #define gfxsupport  //uncomment this line to use a second display with ST7735, ST7789 or ILI9341 displays ON SPI0
+#define gfxsupport  //uncomment this line to use a second display with ST7735, ST7789 or ILI9341 displays ON SPI0
 #define internalrepl //uncomment this line for for INTERNAL REPL USE
 #define qwertz //uncomment this line for German keyboard translation
 #define lisplibrary
@@ -68,14 +68,24 @@
   #undef MEMBANK
   #define MEMBANK DMAMEM
   #if defined RA8875_gfx
-    //#define PIN_TFT_CS 9
-    #define PIN_TFT_CS 38
-    #define PIN_TFT_RST 10
-    #define PIN_TFT_INT 4
+    #define PIN_TFT1_CS 38
+    #define PIN_TFT1_RST 10
+    //#define PIN_TFT_INT 4
     #include <Adafruit_GFX.h>
     #include "Adafruit_RA8875_spi1.h"
-    Adafruit_RA8875 tft1 = Adafruit_RA8875(PIN_TFT_CS, PIN_TFT_RST);
+    Adafruit_RA8875 tft1 = Adafruit_RA8875(PIN_TFT1_CS, PIN_TFT1_RST);
     const int COLOR_WHITE = 0xffff, COLOR_BLACK = 0;
+  #endif
+  #if defined gfxsupport
+    #define PIN_TFT_MOSI 3
+    #define PIN_TFT_SCK 4
+    #define PIN_TFT_CS 9
+    #define PIN_TFT_RST 8
+    #define PIN_TFT_A0 6
+    #define PIN_TFT_BACKLIGHT 5
+    #include <Adafruit_GFX.h>
+    #include <Adafruit_ST7735.h>
+    Adafruit_ST7735 tft = Adafruit_ST7735(PIN_TFT_CS, PIN_TFT_A0, PIN_TFT_RST);
   #endif
   #if defined(rfm69)
     #define PIN_RADIO_CS 5
@@ -7871,12 +7881,6 @@ void initenv () {
 }
 
 void initgfx () {
-  #if defined(gfxsupport)
-    const int TFT_BACKLIGHT = 47;
-    #include <Adafruit_GFX.h>    // Core graphics library
-    #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
-    Adafruit_ST7735 tft = Adafruit_ST7735(44, 45, 41, 42, 46);
-  #endif
   #if defined(RA8875_gfx)
     if (!tft1.begin(RA8875_800x480)) {
       Serial.println("RA8875 Not Found!");
@@ -7892,6 +7896,15 @@ void initgfx () {
     tft1.textMode();
     tft1.setScrollWindow(0, 0, 799, 479, RA8875_SCROLL_BOTH);
     tft1.scrollY((Leading * Scroll) - 1);
+  #endif
+
+  #if defined(gfxsupport)
+    tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
+    //tft.initR(INITR_144GREENTAB);   // initialize a ST7735S chip, green tab
+    tft.setRotation(1);
+    pinMode(PIN_TFT_BACKLIGHT, OUTPUT);
+    analogWrite(PIN_TFT_BACKLIGHT, 255);
+    tft.fillScreen(ST7735_BLACK);
   #endif
 }
 
