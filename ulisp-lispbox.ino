@@ -30,6 +30,7 @@
 #define RA8875_gfx
 // #define rfm69 //uncomment this line for FEATHER M0 RADIO with RFM69 module
 // #define servolib  //uncomment this line to include Arduino "Servo" library into extension
+#define matrixlib //uncomment this line to include Adafruit 8x16 LED matrix library into extension
 
 // Includes
 
@@ -4195,7 +4196,7 @@ object *fn_stringgreater (object *args, object *env) {
 object *fn_stringnoteq (object *args, object *env) {
   (void) env;
   int m = stringcompare(args, true, true, false);
-  return m == -1 ? nil : number(m);
+  return m == -1 ? nil : tee;
 }
 
 object *fn_stringlesseq (object *args, object *env) {
