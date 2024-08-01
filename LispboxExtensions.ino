@@ -19,6 +19,11 @@
 #if defined servolib
   #include <Servo.h>
 #endif
+#if defined matrixlib
+  #include <Wire.h>
+  #include <Adafruit_GFX.h>
+  #include "Adafruit_LEDBackpack.h"
+#endif
 
 // #define NEOPIXEL_NUM 1      //uncomment these two lines when using external NeoPixels - fill in appropriate values
 // #define PIN_NEOPIXEL 11
@@ -56,6 +61,10 @@
 
     struct ulservo* servolist = NULL;
     struct ulservo* curservo = NULL;
+#endif
+
+#if defined matrixlib
+    Adafruit_8x16matrix matrix = Adafruit_8x16matrix();
 #endif
 
 
@@ -1344,6 +1353,123 @@ object *fn_ServoDetach (object *args, object *env) {
 #endif
 
 
+#if defined(matrixlib)
+/*
+  (matrix-begin)
+  Start I2C with address addr and initialize display state (blink off, full brightness).
+*/
+object *fn_MatrixBegin(object *args, object *env) {
+  (void) env;
+  int addr = 0x70;
+  if (args != NULL) {
+    addr = checkinteger(first(args));
+  }
+
+  TwoWire *theWire = &Wire;
+  matrix.begin(addr, theWire);
+  return nil;
+}
+
+/*
+  (matrix-state [st])
+  Turn display on or off
+*/
+object *fn_MatrixState(object *args, object *env) {
+  (void) env;
+  bool state = true;
+
+  if (args != NULL) {
+    state = (first(args) == nil) ? false : true;
+  }
+  matrix.setDisplayState(state);
+  return nil;
+}
+
+/*
+  (matrix-brightness [br])
+  Set display to brightness br. 0 (min) to 15 (max).
+*/
+object *fn_MatrixBrightness(object *args, object *env) {
+  (void) env;
+  int br = 15;
+  if (args != NULL) {
+    br = checkinteger(first(args));
+  }
+  matrix.setBrightness(br);
+  return nil;
+}
+
+/*
+  (matrix-blink-rate [br])
+  Set display blink rate hz. 0 = no blinking, 1 = 1 Hz, 2 = 2 Hz, 3 = 0.5 Hz.
+*/
+object *fn_MatrixBlinkRate(object *args, object *env) {
+  (void) env;
+  int br = 0;
+  if (args != NULL) {
+    br = checkinteger(first(args));
+  }
+  switch (br) {
+    case 0:
+      matrix.blinkRate(HT16K33_BLINK_OFF);
+      break;
+    case 1:
+      matrix.blinkRate(HT16K33_BLINK_1HZ);
+      break;
+    case 2:
+      matrix.blinkRate(HT16K33_BLINK_2HZ);
+      break;
+    case 3:
+      matrix.blinkRate(HT16K33_BLINK_HALFHZ);
+  }
+  return nil;
+}
+
+/*
+  (matrix-show)
+  Issue buffered data in RAM to display.
+*/
+object *fn_MatrixShow(object *args, object *env) {
+  (void) args, (void) env;
+  matrix.writeDisplay();
+  return nil;
+}
+
+/*
+  (matrix-clear)
+  Clear display.
+*/
+object *fn_MatrixClear(object *args, object *env) {
+  (void) args, (void) env;
+  matrix.clear();
+  return nil;
+}
+
+/*
+  (matrix-draw-rect x y w h col)
+  Wrapper copied from uLisp GFX. See doc there.
+*/
+object *fn_MatrixDrawRect (object *args, object *env) {
+  (void) env;
+  uint16_t params[4], colour = LED_ON;
+  for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  if (args != NULL) colour = checkinteger(car(args));
+  matrix.drawRect(params[0], params[1], params[2], params[3], colour);
+  return nil;
+}
+
+/*
+  (matrix-set-rotation r)
+  Set rotation of screen, see Adafruit GFX.
+*/
+object *fn_MatrixSetRotation (object *args, object *env) {
+  (void) env;
+  matrix.setRotation(checkinteger(first(args)));
+  return nil;
+}
+
+#endif
+
 // Symbol names
 
 //USB host keyboard supported anytime
@@ -1418,6 +1544,17 @@ const char stringServoWrite[] PROGMEM = "servo-write";
 const char stringServoWriteMicroseconds[] PROGMEM = "servo-write-microseconds";
 const char stringServoRead[] PROGMEM = "servo-read";
 const char stringServoDetach[] PROGMEM = "servo-detach";
+#endif
+
+#if defined(matrixlib)
+const char stringMatrixBegin[] PROGMEM = "matrix-begin";
+const char stringMatrixClear[] PROGMEM = "matrix-clear";
+const char stringMatrixState[] PROGMEM = "matrix-state";
+const char stringMatrixBrightness[] PROGMEM = "matrix-brightness";
+const char stringMatrixBlinkRate[] PROGMEM = "matrix-blink-rate";
+const char stringMatrixShow[] PROGMEM = "matrix-show";
+const char stringMatrixDrawRect[] PROGMEM = "matrix-draw-rect";
+const char stringMatrixSetRotation[] PROGMEM = "matrix-set-rotation";
 #endif
 
 
@@ -1561,6 +1698,25 @@ const char docServoDetach[] PROGMEM = "(servo-detach snum)\n"
 "Detach servo snum, thus freeing the assigned pin for other tasks.";
 #endif
 
+#if defined(matrixlib)
+const char docMatrixBegin[] PROGMEM = "(matrix-begin)\n"
+"Start I2C with address addr and initialize display state (blink off, full brightness).";
+const char docMatrixClear[] PROGMEM = "(matrix-clear)\n"
+"Clear display.";
+const char docMatrixState[] PROGMEM = "(matrix-state [st])\n"
+"Turn display on or off";
+const char docMatrixBrightness[] PROGMEM = "(matrix-brightness [br])\n"
+"Set display to brightness br. 0 (min) to 15 (max).";
+const char docMatrixBlinkRate[] PROGMEM = "(matrix-blink-rate [br])\n"
+"Set display blink rate hz. 0 = no blinking, 1 = 1 Hz, 2 = 2 Hz, 3 = 0.5 Hz.";
+const char docMatrixShow[] PROGMEM = "(matrix-show)\n"
+"Issue buffered data in RAM to display.";
+const char docMatrixDrawRect[] PROGMEM = "(matrix-draw-rect x y w h col)\n"
+"Wrapper copied from uLisp GFX. See doc there.";
+const char docMatrixSetRotation[] PROGMEM = "(matrix-set-rotation r)\n"
+"Set rotation of screen, see Adafruit GFX.";
+#endif
+
 // Symbol lookup table
 const tbl_entry_t lookup_table2[] PROGMEM = {
 
@@ -1640,7 +1796,18 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringServoWriteMicroseconds, fn_ServoWriteMicroseconds, 0222, docServoWriteMicroseconds },
   { stringServoRead, fn_ServoRead, 0211, docServoRead },
   { stringServoDetach, fn_ServoDetach, 0211, docServoDetach },
-#endif  
+#endif
+
+#if defined(matrixlib)
+  { stringMatrixBegin, fn_MatrixBegin, 0201, docMatrixBegin },
+  { stringMatrixClear, fn_MatrixClear, 0200, docMatrixClear },
+  { stringMatrixState, fn_MatrixState, 0201, docMatrixState },
+  { stringMatrixBrightness, fn_MatrixBrightness, 0201, docMatrixBrightness },
+  { stringMatrixBlinkRate, fn_MatrixBlinkRate, 0201, docMatrixBlinkRate },
+  { stringMatrixShow, fn_MatrixShow, 0200, docMatrixShow },
+  { stringMatrixDrawRect, fn_MatrixDrawRect, 0245, docMatrixDrawRect },
+  { stringMatrixSetRotation, fn_MatrixSetRotation, 0211, docMatrixSetRotation },
+#endif
 };
 
 // Table cross-reference functions - do not edit below this line
