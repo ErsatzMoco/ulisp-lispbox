@@ -22,7 +22,7 @@
 #if defined matrixlib
   #include <Wire.h>
   #include <Adafruit_GFX.h>
-  #include "Adafruit_LEDBackpack.h"
+  #include <Adafruit_LEDBackpack.h>
 #endif
 
 // #define NEOPIXEL_NUM 1      //uncomment these two lines when using external NeoPixels - fill in appropriate values
