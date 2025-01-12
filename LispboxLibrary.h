@@ -71,6 +71,11 @@
 
 const char LispLibrary[] PROGMEM = R"lisplibrary(
 
+#|																																		|#
+#| set the following variable to nil to deactivate Lispy Little Helper|#
+#|																																		|#
+(defvar se:help-active t)
+
 ;
 ; Extended ULOS functions
 ;
@@ -130,20 +135,31 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 
 
 ;
+; RGB helper function
+;
+;
+(defun rgb (r g b)
+  (logior (ash (logand r #xf8) 8) (ash (logand g #xfc) 3) (ash b -3))
+)
+
+
+;
 ; LispBox screen editor
 ;
 ;
 (defun se:init (sk)
 	(case sk 
 		(t 
-		 (defvar se:code_col (class 'color '(red 255 green 255 blue 255)))
-		 (defvar se:line_col (class 'color '(red 90 green 90 blue 90)))
-		 (defvar se:border_col (class 'color '(red 63 green 40 blue 0)))
-		 (defvar se:bg_col (class 'color '(red 0 green 0 blue 0)))
-		 (defvar se:cursor_col (class 'color '(red 160 green 60 blue 0)))
-		 (defvar se:emph_col (class 'color '(red 0 green 128 blue 0)))
-		 (defvar se:alert_col (class 'color '(red 255 green 0 blue 0)))
-		 (defvar se:input_col (class 'color '(red 255 green 255 blue 255)))
+		 (defvar se:code_col (rgb 255 255 255))
+		 (defvar se:line_col (rgb 90 90 90))
+		 (defvar se:border_col (rgb 63 40 0))
+		 (defvar se:bg_col (rgb 0 0 0))
+		 (defvar se:cursor_col (rgb 160 60 0))
+		 (defvar se:emph_col (rgb 0 128 0))
+		 (defvar se:alert_col (rgb 255 0 0))
+		 (defvar se:input_col (rgb 255 255 255))
+
+		 (defvar se:help_col (rgb 255 127 0))
 		)
 	)
 
@@ -167,18 +183,25 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	(defvar se:match nil)
 	(defvar se:exit nil)
 
+	(fill-screen)
+	(set-cursor 0 0)
+	(set-text-color se:code_col se:bg_col)
+
 	(tft1-graphics-mode)
 	(tft1-set-scroll-win 0 0 800 480)
 	(tft1-set-scrollX 0)
 	(tft1-set-scrollY 0)
 	(tft1-fill-screen)
-	(tft1-draw-line 33 17 33 451 (cmt se:border_col '_to-16bit))
-	(tft1-draw-line 0 451 799 451 (cmt se:border_col '_to-16bit))
+	(tft1-draw-line 33 17 33 451 se:border_col)
+	(tft1-draw-line 0 451 799 451 se:border_col)
 	(tft1-text-mode)
 	#| (tft1-text-enlarge (1- se:tscale)) |#
 	(tft1-set-cursor 0 0)
-	(tft1-set-text-color (cmt se:bg_col '_to-16bit) (cmt se:cursor_col '_to-16bit))
-	(tft1-write-text "F1 togg () | F2 chk () | F5 bind |                          | F9 del | F10 save | F11 load | F12 dir")
+	(tft1-set-text-color se:bg_col se:cursor_col)
+	(if se:help-active
+		(tft1-write-text "F1/F2 chk () | F3 help | F5 bind |                          | F9 del | F10 save | F11 load | F12 dir")
+		(tft1-write-text "F1/F2 chk () | F5 bind |                                    | F9 del | F10 save | F11 load | F12 dir")
+	)
 )
 
 (defun se:cleanup ()
@@ -194,17 +217,17 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 		(let ((spos nil) (bpos (car se:lastmatch)) (br (cdr se:lastmatch)))
 			(setf spos (se:calc-scrpos bpos))
 			(tft1-set-cursor (car spos) (cdr spos)) 
-			(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:bg_col '_to-16bit))
+			(tft1-set-text-color se:code_col se:bg_col)
 			(tft1-write-text (string br))
 			(setf se:lastmatch nil)
 		)
 	)
 	(when se:lastc 
 		(tft1-set-cursor (car se:scrpos) (cdr se:scrpos)) 
-		(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:bg_col '_to-16bit))
+		(tft1-set-text-color se:code_col se:bg_col)
 		(tft1-write-text (string se:lastc))
 		(tft1-set-cursor 0 (cdr se:scrpos))
-		(tft1-set-text-color (cmt se:line_col '_to-16bit))
+		(tft1-set-text-color se:line_col)
 		(tft1-write-text (string (1+ (cdr se:txtpos))))
 	)
 )
@@ -220,7 +243,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 		(setf se:curline (nth y se:buffer))
 		(setf se:scrpos (se:calc-scrpos se:txtpos))
 		(tft1-set-cursor (car se:scrpos) (cdr se:scrpos))
-		(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:cursor_col '_to-16bit))
+		(tft1-set-text-color se:code_col se:cursor_col)
 		#| check if cursor is within line string or behind last char |#
 		(when (< x (length se:curline)) (setf myc (char se:curline x)))
 		(setf se:lastc myc)
@@ -233,7 +256,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 			(se:write-char (char-code myc))
 		)
 		(tft1-set-cursor 0 (cdr se:scrpos))
-		(tft1-set-text-color (cmt se:cursor_col '_to-16bit))
+		(tft1-set-text-color se:cursor_col)
 		(tft1-write-text (string (1+ y)))
 	)
 )
@@ -244,14 +267,14 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 		(progn
 			(setf se:match nil) (setf se:openings ()) (setf se:closings ())
 			(tft1-set-cursor 0 0)
-			(tft1-set-text-color (cmt se:bg_col '_to-16bit) (cmt se:cursor_col '_to-16bit))
+			(tft1-set-text-color se:bg_col se:cursor_col)
 			(tft1-write-text "F1")
 			(keyboard-flush)
 		)
 		(progn
 			(setf se:match t)
 			(tft1-set-cursor 0 0)
-			(tft1-set-text-color (cmt se:bg_col '_to-16bit) (cmt se:emph_col '_to-16bit))
+			(tft1-set-text-color se:bg_col se:emph_col)
 			(tft1-write-text "F1")
 			(se:hide-cursor)
 			(se:map-brackets)
@@ -270,7 +293,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	(setf se:closings ())
 	(setf se:match nil)
 	(tft1-set-cursor 0 0)
-	(tft1-set-text-color (cmt se:bg_col '_to-16bit) (cmt se:cursor_col '_to-16bit))
+	(tft1-set-text-color se:bg_col se:cursor_col)
 	(tft1-write-text "F1")
 	(keyboard-flush)
 )
@@ -383,15 +406,15 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 					(when (se:in-window bpos)
 						(setf spos (se:calc-scrpos bpos))
 						(tft1-set-cursor (car spos) (cdr spos))
-						(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:emph_col '_to-16bit))
+						(tft1-set-text-color se:code_col se:emph_col)
 						(tft1-write-text ")")
 						(setf se:lastmatch (cons bpos ")"))
 					)
-					(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:emph_col '_to-16bit))
+					(tft1-set-text-color se:code_col se:emph_col)
 				)
 				(tft1-set-cursor (car se:scrpos) (cdr se:scrpos))
 				(tft1-write-text (string (code-char cc)))
-				(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:bg_col '_to-16bit))
+				(tft1-set-text-color se:code_col se:bg_col)
 			)
 			((and (= cc 41) se:match)
 				(setf bpos (se:find-opening-bracket))
@@ -399,15 +422,15 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 					(when (se:in-window bpos)
 						(setf spos (se:calc-scrpos bpos))
 						(tft1-set-cursor (car spos) (cdr spos))
-						(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:emph_col '_to-16bit))
+						(tft1-set-text-color se:code_col se:emph_col)
 						(tft1-write-text "(")
 						(setf se:lastmatch (cons bpos "("))
 					)
-					(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:emph_col '_to-16bit))
+					(tft1-set-text-color se:code_col se:emph_col)
 				)
 				(tft1-set-cursor (car se:scrpos) (cdr se:scrpos))
 				(tft1-write-text (string (code-char cc)))
-				(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:bg_col '_to-16bit))
+				(tft1-set-text-color se:code_col se:bg_col)
 			)
 			(t (tft1-write-text (string (code-char cc))))
 		)
@@ -417,12 +440,12 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 (defun se:disp-line (y)
 	(let ((ypos (+ (cdr se:origin) (* (- y (cdr se:offset)) se:leading))) (myl " "))
 		(when (nth y se:buffer) (setf myl (concatenate 'string (nth y se:buffer) myl)))
-		(tft1-set-text-color (cmt se:line_col '_to-16bit))
+		(tft1-set-text-color se:line_col)
 		(tft1-set-cursor 0 ypos)
 		(tft1-write-text (string (1+ y)))
 
 		(tft1-set-cursor (car se:origin) ypos)
-		(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:bg_col '_to-16bit))
+		(tft1-set-text-color se:code_col se:bg_col)
 		(when (> (length myl) (car se:offset))
 			(tft1-write-text (subseq myl (car se:offset) (min (length myl) (+ (car se:txtmax) (car se:offset) 1))))
 		)
@@ -430,8 +453,8 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun se:show-text ()
-	(tft1-fill-rect 34 18 763 432 (cmt se:bg_col '_to-16bit))
-	(tft1-fill-rect 0 18 33 432 (cmt se:bg_col '_to-16bit))
+	(tft1-fill-rect 34 18 763 432 se:bg_col)
+	(tft1-fill-rect 0 18 33 432 se:bg_col)
 	(let ((i 0) (ymax (min (cdr se:txtmax) (- (length se:buffer) (cdr se:offset) 1))))
 		(loop
 			(se:disp-line (+ i (cdr se:offset)))
@@ -444,9 +467,9 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 (defun se:show-dir ()
 	(keyboard-flush)
 	(se:hide-cursor)
-	(tft1-fill-rect 34 18 763 432 (cmt se:bg_col '_to-16bit))
-	(tft1-fill-rect 0 18 33 432 (cmt se:bg_col '_to-16bit))
-	(tft1-set-text-color (cmt se:line_col '_to-16bit))
+	(tft1-fill-rect 34 18 763 432 se:bg_col)
+	(tft1-fill-rect 0 18 33 432 se:bg_col)
+	(tft1-set-text-color se:line_col)
 	(let ((spos (se:calc-scrpos (cons 0 0))))
 		(tft1-set-cursor (car spos) (cdr spos))
 		(tft1-write-text "/")
@@ -472,8 +495,8 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 					(unless (or (> (car dpos) (- (car se:txtmax) (length entry))) (> (cdr dpos) (cdr se:txtmax)))
 						(setf spos (se:calc-scrpos dpos))
 						(if (search "/" entry)
-							(tft1-set-text-color (cmt se:line_col '_to-16bit))
-							(tft1-set-text-color (cmt se:code_col '_to-16bit))
+							(tft1-set-text-color se:line_col)
+							(tft1-set-text-color se:code_col)
 						)
 						(tft1-set-cursor (car spos) (cdr spos))
 						(tft1-write-text entry)
@@ -766,7 +789,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 				)
 			)
 			(tft1-set-cursor (* 36 se:cwidth) 0)
-			(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:cursor_col '_to-16bit))
+			(tft1-set-text-color se:code_col se:cursor_col)
 			(setf se:filename fname)
 			(setf se:suffix suffix)
 			(tft1-write-text (concatenate 'string "FILE: " fname "." suffix "       "))
@@ -795,7 +818,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 				(se:hide-cursor)
 				(se:map-brackets t)
 				(tft1-set-cursor (* 36 se:cwidth) 0)
-				(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:cursor_col '_to-16bit))
+				(tft1-set-text-color se:code_col se:cursor_col)
 				(setf se:filename fname)
 				(setf se:suffix suffix)
 				(tft1-write-text (concatenate 'string "FILE: " fname "." suffix "       "))
@@ -827,8 +850,8 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 
 (defun se:msg (mymsg &optional alert cursor)
 	(if alert
-		(tft1-set-text-color (cmt se:alert_col '_to-16bit))
-		(tft1-set-text-color (cmt se:emph_col '_to-16bit))
+		(tft1-set-text-color se:alert_col)
+		(tft1-set-text-color se:emph_col)
 	)
 	(let ((spos (se:calc-msgpos (cons 0 (1+ (cdr se:txtmax))))))
 		(tft1-set-cursor (+ (car spos) 2) (+ (cdr spos) 2))
@@ -837,7 +860,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	(when cursor
 		(setf cursor (max 0 cursor))
 		(let ((spos (se:calc-msgpos (cons cursor (1+ (cdr se:txtmax))))))
-			(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:emph_col '_to-16bit))
+			(tft1-set-text-color se:code_col se:emph_col)
 			(tft1-set-cursor (+ (car spos) 2) (+ (cdr spos) 2))
 			(tft1-write-text (subseq mymsg cursor (1+ cursor)))
 		)
@@ -903,7 +926,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun se:clr-msg ()
-	(tft1-fill-rect 34 452 763 27 (cmt se:bg_col '_to-16bit))
+	(tft1-fill-rect 34 452 763 27 se:bg_col)
 )
 
 (defun se:sedit (&optional myform myskin)
@@ -922,7 +945,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 					(setf se:funcname (prin1-to-string myform)) 
 					(setq se:buffer (split-string-to-list "~%" (string (with-output-to-string (str) (pprint (eval myform) t str)))))
 					(tft1-set-cursor (* 36 se:cwidth) 0)
-					(tft1-set-text-color (cmt se:code_col '_to-16bit) (cmt se:cursor_col '_to-16bit))
+					(tft1-set-text-color se:code_col se:cursor_col)
 					(if (> (length se:funcname) 13)
 						(tft1-write-text (concatenate 'string "SYM: " (subseq se:funcname 0 10) "..."))
 						(tft1-write-text (concatenate 'string "SYM: " se:funcname))
@@ -949,6 +972,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 							(214 (se:nextpage))
 							(194 (se:toggle-match) (setf lastkey nil))
 							(195 (se:checkbr) (setf lastkey nil))
+							(196 (se:help) (setf lastkey nil))
 							(198 (se:run) (setf lastkey nil))
 							(202 (se:remove) (setf lastkey nil))
 							(203 (se:save) (setf lastkey nil))
@@ -977,6 +1001,442 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	)
 	(keyboard-flush)
 	nil
+)
+
+
+;
+; LispBox editor help screen
+;
+;
+(defun se:ref (chr)
+		(mapcan 
+			(lambda (x)
+				(let ((entry ""))
+					(when x
+						(setf entry (search chr (string x)))
+						(when entry
+							(when (and (< entry 1) (> (length (string x)) 0)) (list x))
+						)
+					)
+				)
+			) 
+			(apropos-list chr)
+		)
+)
+
+
+(defun se:build-ref (chr)
+	(let ((reflist nil)
+		  (ele nil))
+		(setf reflist (sort (mapcar princ-to-string (se:ref chr)) string<))
+		(if reflist
+			(progn
+				(setf se:ref-array (make-array (length reflist)))
+				(dotimes (i (length reflist))
+					(setf ele (pop reflist))
+					(when (> (length ele) 0) (setf (aref se:ref-array i) ele))
+				)
+			)
+			(progn
+				(setf se:ref-array (make-array 1))
+				(setf (aref se:ref-array 0) "No entry")
+			)
+		)
+	)
+)
+
+
+(defun se:build-doc (ctr)
+	(when (> ctr (1- (length se:ref-array))) (setf ctr (1- (length se:ref-array))))
+	(when (< ctr 0) (setf ctr 0))
+	(let ((docstring (documentation (read-from-string (aref se:ref-array ctr))))
+		  (numlines 0)
+		  (prlist nil)
+		  (splitlist nil)
+		  (linelist nil)
+		  (text "")
+		  (line "")
+		  (headerlines 1)
+		  )
+		(if (< (length docstring) 1)
+			(progn 
+				(setf se:docline-array (make-array '(2 1)))
+				(setf (aref se:docline-array 0 0) "No doc")
+				(setf (aref se:docline-array 1 0) t)
+			)
+			(progn
+				(setf prlist (split-string-to-list (string #\Newline) docstring))
+				(if (<= (length (first prlist)) se:maxchar)
+					(setf linelist (list (pop prlist)))
+					(let ((header (pop prlist))) 
+						(setf linelist (list (subseq header 0 se:maxchar)))
+						(setf header (subseq header se:maxchar (length header)))
+						(loop
+							(setf headerlines (1+ headerlines))
+							(if (<= (length header) se:maxchar)
+								(progn 
+									(setf linelist (append linelist (list header)))
+									(return)
+								)
+								(progn 
+									(setf linelist (append linelist (list (subseq header 0 (1+ se:maxchar)))))
+									(setf header (subseq header se:maxchar (length header)))
+								)
+							)
+						)
+					)
+				)
+				
+				(loop
+					(unless prlist (return))
+					(setf text (pop prlist))
+					(setf splitlist (split-string-to-list " " text))
+					(setf text "")
+					(setf line (pop splitlist))
+					(loop
+						(unless splitlist (return))
+						(setf text (pop splitlist))
+						(if (<= (+ (length line) (length text) 1) se:maxchar)
+							(setf line (concatenate 'string line " " text))
+							(progn
+								(setf linelist (append linelist (list line)))
+								(setf line text)
+							)
+						)
+					)
+					(setf linelist (append linelist (list line)))
+				)
+				(setf numlines (length linelist))
+				(setf se:docline-array (make-array (list 2 numlines)))
+
+				(dotimes (i numlines)
+					(setf (aref se:docline-array 0 i) (pop linelist))
+					(if (< i headerlines)
+						(setf (aref se:docline-array 1 i) t)
+						(setf (aref se:docline-array 1 i) nil)
+					)
+				)
+			)
+		)
+	)
+)
+
+
+(defun se:print-ref (&optional new cctr)
+	(se:hide-tft-cursor)
+	(when new (fill-screen) (setf se:rctr 0))
+	(let ((reflength (length se:ref-array))
+		 (refstart 0)
+		 (offset (floor (/ se:maxlines 2)))
+		 (refstr "")
+		 (prstr "")
+		 (ctr se:rctr)
+		 )
+
+		(when cctr (setf ctr cctr))
+		#| (when (> ctr (1- reflength)) (setf ctr (1- reflength)))
+		(when (< ctr 0) (setf ctr 0)) |#
+		(setf ctr (constrain ctr 0 (- reflength 1)))
+		(setf se:rctr ctr)
+
+		(if (and (not new) (or (and (< ctr offset) (> ctr 0)) (> ctr (- reflength offset))))
+			(progn 
+				(setf refstr (aref se:ref-array ctr))
+				(setf prstr (subseq refstr 0 (min se:maxchar (length refstr))))
+				(setf se:crlin prstr)
+				(if (<= ctr offset)
+					(setf se:tftcrs ctr)
+					(setf se:tftcrs (- (min se:maxlines reflength) (- reflength ctr)))
+				)
+			)
+			(progn
+				(fill-screen)
+				(setf refstart (max (- ctr offset) 0))
+				(setf refstart (max (min (- reflength se:maxlines) refstart) 0))
+				(dotimes (i (min se:maxlines reflength))
+					(setf refstr (aref se:ref-array (+ refstart i)))
+					(setf prstr (subseq refstr 0 (min se:maxchar (length refstr))))
+					(if (= (+ refstart i) ctr)
+						(progn 
+							(setf se:crlin prstr)
+							(setf se:tftcrs i)
+						)
+						(progn 
+							(set-cursor 0 (* i se:cysize))
+							(with-gfx (strm)
+								(princ prstr strm)
+							)
+						)
+					)
+				)
+			)
+		)
+	)
+	(se:show-tft-cursor)
+)
+
+
+(defun se:print-doc (&optional new cctr)
+	(fill-screen)
+	(set-cursor 0 0)
+	(let ((dalength (second (array-dimensions se:docline-array)))
+		 (prstr "")
+		 (ctr se:dctr)
+		 (cold se:dctr)
+		 )
+		
+		(when cctr (setf ctr cctr))
+		(when (> ctr (min (- dalength se:maxlines) dalength)) (setf ctr (min (- dalength se:maxlines) dalength)))
+		(when (< ctr 0) (setf ctr 0))
+		(setf se:dctr ctr)
+
+		(dotimes (i (min se:maxlines dalength))
+			(setf prstr (aref se:docline-array 0 (+ ctr i)))
+			(if (aref se:docline-array 1 (+ ctr i))
+				(set-text-color se:bg_col se:help_col)
+				(set-text-color se:code_col se:bg_col)
+			)
+			(set-cursor 0 (* i se:cysize))
+			(with-gfx (strm)
+				(princ prstr strm)
+			)
+		)
+	)
+)
+
+
+(defun se:wait-encoder ()
+	(keyboard-flush)
+	(let ((sw-event nil)
+				(rot-event 0)
+			  (lkd nil))
+		(loop
+			(when (or (eq sw-event t) (= rot-event 2) lkd) (return))
+			(unless (eq (digitalread se:SW) se:sw-state)
+				(delay 2)
+				(setf se:sw-state (digitalread se:SW))
+				(setf sw-event t)
+			)
+
+			(unless (eq (digitalread se:CLK) se:clk-state)
+        (delay 1)
+				(setf se:clk-state (digitalread se:CLK))
+				(if (eq (digitalread se:CLK) (digitalread se:DT))
+					(setf se:direction "CCW")
+					(setf se:direction "CW")
+				)
+				(setf rot-event (1+ rot-event))
+			)
+
+			(setf lkd (keyboard-get-key t))
+		)
+		(list sw-event rot-event lkd)
+	)
+)
+
+
+(defun se:eval-encoder (cstart cmax rot-fun sw-fun &optional key-fun)
+
+	(let ((sw-event nil)
+		  (rot-event 0)
+		  (key-event nil)
+		  (wait-time 0)
+		  (result nil)
+		  (ctr cstart))
+
+		(loop
+			(setf wait-time (for-millis () (setf result (se:wait-encoder))))
+			(setf sw-event (first result))
+			(setf rot-event (second result))
+			(setf key-event (third result))
+
+			(when key-event
+				(when key-fun (key-fun key-event))
+				(keyboard-flush)
+				(return key-event)
+			)
+
+			(when (and sw-event se:sw-state)
+				(sw-fun ctr)
+				(return nil)
+			)
+			(when (= rot-event 2)
+				(when (and (< wait-time 10) (not (equal se:direction se:previous-direction)))
+					(setf se:direction se:previous-direction))
+				(if (equal se:direction "CCW")
+					(setf ctr (min cmax (1+ ctr)))
+					(setf ctr (max 0 (1- ctr)))
+				)
+				(rot-fun nil ctr)
+				(setf rot-event 0)
+				(setf se:previous-direction se:direction)
+			)
+		)
+		key-event
+	)
+)
+
+(defun se:insert-fun (ctr)
+	(let ((dalength (second (array-dimensions se:docline-array)))
+		 (prstr "")
+		 (ctr 0))
+		(unless (equal (aref se:docline-array 0 0) "No doc")
+			(loop
+				(setf prstr (aref se:docline-array 0 ctr))
+				(if (aref se:docline-array 1 ctr)
+					(progn 
+						(when (boundp 'se:buffer)
+							(dotimes (i (length prstr))
+								(se:insert (char prstr i))
+							)
+						)
+						(setf se:last-cmd (concatenate 'string se:last-cmd prstr))
+						(setf ctr (1+ ctr))
+					)
+					(return)
+				)
+			)
+		)
+	)
+)
+
+
+(defun se:hide-tft-cursor ()
+	(when (> (length se:crlin) 0)
+		(fill-rect 0 (* se:tftcrs se:cysize) se:xsize se:cysize 0)
+		(set-cursor 0 (* se:tftcrs se:cysize))
+		(set-text-color se:code_col se:bg_col)
+		(with-gfx (strm)
+			(princ se:crlin strm)
+		)	
+	)
+)
+
+
+(defun se:show-tft-cursor ()
+	(when (> (length se:crlin) 0)
+		(set-cursor 0 (* se:tftcrs se:cysize))
+		(set-text-color se:bg_col se:help_col)
+		(with-gfx (strm)
+			(princ se:crlin strm)
+		)	
+	)
+)
+
+
+(defun se:help ()
+
+	(when se:help-active
+		(defvar se:code_col (rgb 255 255 255))
+		(defvar se:line_col (rgb 90 90 90))
+		(defvar se:border_col (rgb 63 40 0))
+		(defvar se:bg_col (rgb 0 0 0))
+		(defvar se:cursor_col (rgb 160 60 0))
+		(defvar se:emph_col (rgb 0 128 0))
+		(defvar se:alert_col (rgb 255 0 0))
+		(defvar se:input_col (rgb 255 255 255))
+
+		(defvar se:help_col (rgb 255 127 0))
+
+		(defvar se:CLK 16)
+		(defvar se:DT 14)
+		(defvar se:SW 20)
+
+		(pinmode se:CLK nil)
+		(pinmode se:DT nil)
+		(pinmode se:SW nil)
+
+		(defvar se:sw-state t)
+		(defvar se:clk-state (digitalread se:CLK))
+		(defvar se:direction nil)
+		(defvar se:previous-direction nil)
+
+		(defvar se:rctr 0)
+		(defvar se:dctr 0)
+		(defvar se:tftcrs 0)
+		(defvar se:crlin "")
+
+		(defvar se:ref-array nil)
+		(defvar se:docline-array nil)
+		(defvar se:last-cmd "")
+		(defvar se:xsize 160)
+		(defvar se:ysize 128)
+		(defvar se:cxsize 6)
+		(defvar se:cysize 8)
+		(defvar se:maxlines (floor (/ se:ysize se:cysize)))
+		(defvar se:maxchar (floor (/ se:xsize se:cxsize)))
+
+		(let ((result nil)
+			  (esc nil))
+
+			(fill-screen)
+			(set-cursor 0 0)
+			(set-text-color se:code_col se:bg_col)
+			(with-gfx (strm)
+				(princ (concatenate 'string "Press key or encoder!" (string #\Newline) "F3 to exit.") strm)
+			)
+			(setf result (se:wait-encoder))
+
+			(if (third result)
+				(progn
+					(if (and (> (third result) 32) (< (third result) 127))
+						(se:build-ref (string (code-char (third result))))
+						(se:build-ref "")
+					)
+					(if (= (third result) 196)
+						(progn 
+							(fill-screen)
+							(set-cursor 0 0)
+							(setf esc t)
+						)
+					)
+				)
+				(se:build-ref "")
+			)
+			(unless esc
+				(defvar se:sw-state t)
+				(se:print-ref t)
+				(loop
+					(setf result (se:eval-encoder se:rctr (1- (length se:ref-array)) se:print-ref se:build-doc))
+					(when result
+						(when (= result 196)
+							(return)
+						)
+						(if (and (> result 32) (< result 127))
+							(se:build-ref (string (code-char result)))
+							(se:build-ref "")
+						)
+						(setf se:dctr 0)
+						(se:print-ref t)
+					)
+					(unless result
+						(fill-screen)
+						(se:print-doc)
+						(setf result (se:eval-encoder se:dctr (second (array-dimensions se:docline-array)) se:print-doc se:insert-fun))
+						(when result
+							(when (= result 196)
+								(return)
+							)
+							(if (and (> result 32) (< result 127))
+								(se:build-ref (string (code-char result)))
+								(se:build-ref "")
+							)
+							(setf se:rctr 0)
+						)
+						(se:print-ref t se:rctr)
+					)
+				)
+				(fill-screen)
+			)
+			(makunbound 'se:ref-array)
+			(makunbound 'se:docline-array)
+		)
+	)
+
+	(if se:help-active
+		se:last-cmd
+		"Deactivated. To activate LLH set se:help-active to t."
+	)
 )
 
 

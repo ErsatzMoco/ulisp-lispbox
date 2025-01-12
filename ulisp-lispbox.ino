@@ -28,6 +28,7 @@
 // #define vt100
 #define extensions
 #define RA8875_gfx
+#define oled_gfx
 // #define rfm69 //uncomment this line for FEATHER M0 RADIO with RFM69 module
 // #define servolib  //uncomment this line to include Arduino "Servo" library into extension
 // #define matrixlib //uncomment this line to include Adafruit 8x16 LED matrix library into extension

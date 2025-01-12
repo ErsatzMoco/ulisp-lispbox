@@ -13,6 +13,10 @@
                      // CURRENTLY MANDATORY BECAUSE OF UNSOLVED ISSUES WITHIN RADIOHEAD LIBRARY --- USE LOWPOWERLAB LIBRARY FOR NOW.
 
 #include <Adafruit_NeoPixel.h>
+#if defined oled_gfx
+  #include <Wire.h>
+  #include <U8g2lib.h>
+#endif
 #if defined rfm69
   #include <RFM69.h>
 #endif
@@ -27,6 +31,10 @@
 
 // #define NEOPIXEL_NUM 1      //uncomment these two lines when using external NeoPixels - fill in appropriate values
 // #define PIN_NEOPIXEL 11
+
+#if defined(oled_gfx)
+  U8G2_SH1106_128X64_NONAME_F_HW_I2C oled = U8G2_SH1106_128X64_NONAME_F_HW_I2C(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
+#endif
 
 #if defined(rfm69)
     // #define FREQUENCY RF69_868MHZ
@@ -954,6 +962,259 @@ object *fn_TFT1ReadStatus (object *args, object *env) {
 #endif
 
 
+//
+// OLED graphics and text routines - in part a modified copy of GFX routines in uLisp core
+// No stream support to avoid major modification of uLisp core 
+//
+
+#if defined (oled_gfx)
+/*
+  (oled-begin [adr])
+  Initialize OLED (optionally using I2C address adr, otherwise using default address #x3C (7 bit)/#x78 (8 bit)).
+*/
+object *fn_OledBegin (object *args, object *env) {
+  (void) env;
+
+  uint8_t adr = 0x78;
+  if (args != NULL) {
+    adr = (uint8_t)checkinteger(first(args));
+  }
+
+  oled.setI2CAddress(adr);
+  if (!oled.begin()) {
+    Serial.println("OLED Not Found!");
+    return nil;
+  }
+  oled.clearBuffer();
+  oled.setFont(u8g2_font_profont12_mr);
+  return tee;
+}  
+
+/*
+  (oled-clear)
+  Clear OLED.
+*/
+object *fn_OledClear (object *args, object *env) {
+  (void) args, (void) env;
+
+  oled.clearBuffer();
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-set-rotation rot)
+  Set rotation of screen. 0 = no rotation, 1 = 90 degrees, 2 = 180 degrees, 3 = 270 degrees, 4 = hor. mirrored, 5 = vert. mirrored.
+*/
+object *fn_OledSetRotation (object *args, object *env) {
+  (void) env;
+  uint8_t rot = (uint8_t)checkinteger(first(args));
+  if (rot > 5) rot = 5;
+
+  switch (rot) {
+    case 0:
+        oled.setDisplayRotation(U8G2_R0);
+    case 1:
+        oled.setDisplayRotation(U8G2_R1);
+    case 2:
+        oled.setDisplayRotation(U8G2_R2);
+    case 3:
+        oled.setDisplayRotation(U8G2_R3);
+    case 4:
+        oled.setDisplayRotation(U8G2_MIRROR);
+    case 5:
+        oled.setDisplayRotation(U8G2_MIRROR_VERTICAL);    
+  }
+  
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-set-color fg)
+  Set foreground color for text and graphics. Colors are 0 (clear/black), 1 (set/white) and 2 (XOR).
+*/
+object *fn_OledSetColor (object *args, object *env) {
+  (void) env;
+
+  uint8_t col = (uint8_t)checkinteger(first(args));
+  if (col > 2) col = 2;
+
+  oled.setDrawColor(col);
+  return nil;
+}
+
+/*
+  (oled-write-char x y c)
+  Write char c to screen at location x y.
+*/
+object *fn_OledWriteChar (object *args, object *env) {
+  (void) env;
+
+  oled.drawGlyph(checkinteger(first(args)), checkinteger(second(args)), checkchar(third(args)));
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-write-string x y str)
+  Write string str to screen at location x y.
+*/
+object *fn_OledWriteString (object *args, object *env) {
+  (void) env;
+
+  int slength = stringlength(checkstring(third(args)))+1;
+  char *oledbuf = (char*)malloc(slength);
+  cstring(third(args), oledbuf, slength);
+  oled.drawStr(checkinteger(first(args)), checkinteger(second(args)), oledbuf);
+  oled.sendBuffer();
+  free(oledbuf);
+  return nil;
+}
+
+/*
+  (oled-draw-pixel x y)
+  Draw pixel at position x y (using color set before).
+*/
+object *fn_OledDrawPixel (object *args, object *env) {
+  (void) env;
+  oled.drawPixel(checkinteger(first(args)), checkinteger(second(args)));
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-draw-line x0 y0 x1 y1)
+  Draw a line between positions x0/y0 and x1/y1.
+*/
+object *fn_OledDrawLine (object *args, object *env) {
+  (void) env;
+  uint16_t params[4];
+  for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawLine(params[0], params[1], params[2], params[3]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-draw-hline x y w)
+  Draw fast horizontal line at position X Y with length w.
+*/
+object *fn_OledDrawHLine (object *args, object *env) {
+  (void) env;
+  uint16_t params[3];
+  for (int i=0; i<3; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawHLine(params[0], params[1], params[2]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-draw-vline x y h)
+  Draw fast vertical line at position X Y with length h.
+*/
+object *fn_OledDrawVLine (object *args, object *env) {
+  (void) env;
+  uint16_t params[3];
+  for (int i=0; i<3; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawVLine(params[0], params[1], params[2]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-draw-rect x y w h)
+  Draw empty rectangle at x y with width w and height h.
+*/
+object *fn_OledDrawRect (object *args, object *env) {
+  (void) env;
+  uint16_t params[4];
+  for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawFrame(params[0], params[1], params[2], params[3]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-fill-rect x y w h)
+  Draw filled rectangle at x y with width w and height h.
+*/
+object *fn_OledFillRect (object *args, object *env) {
+  (void) env;
+  uint16_t params[4];
+  for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawBox(params[0], params[1], params[2], params[3]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-draw-circle x y r)
+  Draw empty circle at position x y with radius r.
+*/
+object *fn_OledDrawCircle (object *args, object *env) {
+  (void) env;
+  uint16_t params[3];
+  for (int i=0; i<3; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawCircle(params[0], params[1], params[2]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-fill-circle x y r)
+  Draw filled circle at position x y with radius r.
+*/
+object *fn_OledFillCircle (object *args, object *env) {
+  (void) env;
+  uint16_t params[3];
+  for (int i=0; i<3; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawDisc(params[0], params[1], params[2]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-draw-round-rect x y w h r)
+  Draw empty rectangle at x y with width w and height h. Edges are rounded with radius r.
+*/
+object *fn_OledDrawRoundRect (object *args, object *env) {
+  (void) env;
+  uint16_t params[5];
+  for (int i=0; i<5; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawRFrame(params[0], params[1], params[2], params[3], params[4]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-fill-round-rect)
+  Draw filled rectangle at x y with width w and height h. Edges are rounded with radius r.
+*/
+object *fn_OledFillRoundRect (object *args, object *env) {
+  (void) env;
+  uint16_t params[5];
+  for (int i=0; i<5; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawRBox(params[0], params[1], params[2], params[3], params[4]);
+  oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-fill-triangle x0 y0 x1 y1 x2 y2)
+  Draw filled triangle with corners at x0/y0, x1/y1 and x2/y2.
+*/
+object *fn_OledFillTriangle (object *args, object *env) {
+  (void) env;
+  uint16_t params[6];
+  for (int i=0; i<6; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  oled.drawTriangle(params[0], params[1], params[2], params[3], params[4], params[5]);
+  oled.sendBuffer();
+  return nil;
+}
+#endif
+
+
 #if defined(rfm69)
 /*
   Helper function:
@@ -1531,6 +1792,26 @@ const char stringTFT1ReadStatus[] PROGMEM = "tft1-read-status";
 const char stringTFT1WriteCommand[] PROGMEM = "tft1-write-command";
 #endif
 
+#if defined(oled_gfx)
+const char stringOledBegin[] PROGMEM = "oled-begin";
+const char stringOledClear[] PROGMEM = "oled-clear";
+const char stringOledSetRotation[] PROGMEM = "oled-set-rotation";
+const char stringOledSetColor[] PROGMEM = "oled-set-color";
+const char stringOledWriteChar[] PROGMEM = "oled-write-char";
+const char stringOledWriteString[] PROGMEM = "oled-write-string";
+const char stringOledDrawPixel[] PROGMEM = "oled-draw-pixel";
+const char stringOledDrawLine[] PROGMEM = "oled-draw-line";
+const char stringOledDrawHLine[] PROGMEM = "oled-draw-hline";
+const char stringOledDrawVLine[] PROGMEM = "oled-draw-vline";
+const char stringOledDrawRect[] PROGMEM = "oled-draw-rect";
+const char stringOledFillRect[] PROGMEM = "oled-fill-rect";
+const char stringOledDrawCircle[] PROGMEM = "oled-draw-circle";
+const char stringOledFillCircle[] PROGMEM = "oled-fill-circle";
+const char stringOledDrawRoundRect[] PROGMEM = "oled-draw-round-rect";
+const char stringOledFillRoundRect[] PROGMEM = "oled-fill-round-rect";
+const char stringOledFillTriangle[] PROGMEM = "oled-fill-triangle";
+#endif
+
 #if defined(rfm69)
 const char stringRFM69Begin[] PROGMEM = "rfm69-begin";
 const char stringRFM69Send[] PROGMEM = "rfm69-send";
@@ -1674,6 +1955,43 @@ const char docTFT1ReadStatus[] PROGMEM = "(tft1-read-status)\n"
 "Low-level access: Read status.";
 #endif
 
+#if defined(oled_gfx)
+const char docOledBegin[] PROGMEM = "(oled-begin adr)\n"
+"Initialize OLED (optionally using I2C address adr, otherwise using default address #x3C (7 bit)/#x78 (8 bit)).";
+const char docOledClear[] PROGMEM = "(oled-clear)\n"
+"Clear OLED.";
+const char docOledSetRotation[] PROGMEM = "(oled-set-rotation rot)\n"
+"Set rotation of screen. 0 = no rotation, 1 = 90 degrees, 2 = 180 degrees, 3 = 270 degrees, 4 = hor. mirrored, 5 = vert. mirrored.";
+const char docOledSetColor[] PROGMEM = "(oled-set-color fg)\n"
+"Set foreground color for text and graphics. Colors are 0 (clear/black), 1 (set/white) and 2 (XOR).";
+const char docOledWriteChar[] PROGMEM = "(oled-write-char x y c)\n"
+"Write char c to screen at location x y.";
+const char docOledWriteString[] PROGMEM = "(oled-write-string x y str)\n"
+"Write string str to screen at location x y.";
+const char docOledDrawPixel[] PROGMEM = "(oled-draw-pixel x y)\n"
+"Draw pixel at position x y (using color set before)";
+const char docOledDrawLine[] PROGMEM = "(oled-draw-line x0 y0 x1 y1)\n"
+"Draw a line between positions x0/y0 and x1/y1.";
+const char docOledDrawHLine[] PROGMEM = "(oled-draw-hline x y w)\n"
+"Draw fast horizontal line at position X Y with length w.";
+const char docOledDrawVLine[] PROGMEM = "(oled-draw-vline x y h)\n"
+"Draw fast vertical line at position X Y with length h.";
+const char docOledDrawRect[] PROGMEM = "(oled-draw-rect x y w h)\n"
+"Draw empty rectangle at x y with width w and height h.";
+const char docOledFillRect[] PROGMEM = "(oled-fill-rect x y w h)\n"
+"Draw empty rectangle at x y with width w and height h.";
+const char docOledDrawCircle[] PROGMEM = "(oled-draw-circle x y r)\n"
+"Draw empty circle at position x y with radius r.";
+const char docOledFillCircle[] PROGMEM = "(oled-fill-circle x y r)\n"
+"Draw filled circle at position x y with radius r.";
+const char docOledDrawRoundRect[] PROGMEM = "(oled-draw-round-rect x y w h r)\n"
+"Draw empty rectangle at x y with width w and height h. Edges are rounded with radius r.";
+const char docOledFillRoundRect[] PROGMEM = "(oled-fill-round-rect x y w h r)\n"
+"Draw filled rectangle at x y with width w and height h. Edges are rounded with radius r.";
+const char docOledFillTriangle[] PROGMEM = "(oled-fill-triangle x0 y0 x1 y1 x2 y2)\n"
+"Draw filled triangle with corners at x0/y0, x1/y1 and x2/y2.";
+#endif
+
 #if defined(rfm69)
 const char docRFM69Begin[] PROGMEM = "(rfm69-begin nodeid netid)\n"
 "Reset RFM69 module and initialize communication with frequency band, node id and net id.";
@@ -1776,6 +2094,26 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringTFT1ReadData, fn_TFT1ReadData, 0200, docTFT1ReadData },
   { stringTFT1WriteCommand, fn_TFT1WriteCommand, 0211, docTFT1WriteCommand },
   { stringTFT1ReadStatus, fn_TFT1ReadStatus, 0200, docTFT1ReadStatus },
+#endif
+
+#if defined(oled_gfx)
+  { stringOledBegin, fn_OledBegin, 0201, docOledBegin },
+  { stringOledClear, fn_OledClear, 0200, docOledClear },
+  { stringOledSetRotation, fn_OledSetRotation, 0211, docOledSetRotation },
+  { stringOledSetColor, fn_OledSetColor, 0211, docOledSetColor },
+  { stringOledWriteChar, fn_OledWriteChar, 0233, docOledWriteChar },
+  { stringOledWriteString, fn_OledWriteString, 0233, docOledWriteString },
+  { stringOledDrawPixel, fn_OledDrawPixel, 0222, docOledDrawPixel },
+  { stringOledDrawLine, fn_OledDrawLine, 0244, docOledDrawLine },
+  { stringOledDrawHLine, fn_OledDrawHLine, 0233, docOledDrawHLine },
+  { stringOledDrawVLine, fn_OledDrawVLine, 0233, docOledDrawVLine },
+  { stringOledDrawRect, fn_OledDrawRect, 0244, docOledDrawRect },
+  { stringOledFillRect, fn_OledFillRect, 0244, docOledFillRect },
+  { stringOledDrawCircle, fn_OledDrawCircle, 0233, docOledDrawCircle },
+  { stringOledFillCircle, fn_OledFillCircle, 0233, docOledFillCircle },
+  { stringOledDrawRoundRect, fn_OledDrawRoundRect, 0255, docOledDrawRoundRect },
+  { stringOledFillRoundRect, fn_OledFillRoundRect, 0255, docOledFillRoundRect },
+  { stringOledFillTriangle, fn_OledFillTriangle, 0266, docOledFillTriangle },
 #endif
 
 #if defined(rfm69)
