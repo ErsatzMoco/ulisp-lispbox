@@ -71,9 +71,8 @@
 
 const char LispLibrary[] PROGMEM = R"lisplibrary(
 
-#|																																		|#
-#| set the following variable to nil to deactivate Lispy Little Helper|#
-#|																																		|#
+#| SET THE FOLLOWING VARIABLE TO NIL TO DEACTIVATE LISPY LITTLE HELPER |#
+
 (defvar se:help-active t)
 
 ;
