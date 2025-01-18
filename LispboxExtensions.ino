@@ -6,6 +6,9 @@
   NeoPixel uLisp Extension - Version 1a - 22nd May 2023
   See http://www.ulisp.com/show?4GMV
 
+  Adopted search-str from
+  M5Cardputer editor version by hasn0life - Nov 2024 - https://github.com/hasn0life/ulisp-sedit-m5cardputer
+
   Licensed under the MIT license: https://opensource.org/licenses/MIT
 */
 
@@ -235,6 +238,36 @@ object *fn_KeyboardFlush (object *args, object *env) {
 
   return nil;
 }
+
+/*
+  (search-str pattern target [startpos])
+  Returns the index of the first occurrence of pattern in target, or nil if it's not found starting from startpos.
+*/
+object *fn_searchstr (object *args, object *env) {
+  (void) env;
+  
+  int startpos = 0;
+  object *pattern = first(args);
+  object *target = second(args);
+  args = cddr(args);
+  if (pattern == NULL) return number(0);
+  else if (target == NULL) return nil;
+  if (args != NULL) startpos = checkinteger(car(args));
+  
+if (stringp(pattern) && stringp(target)) {
+    int l = stringlength(target);
+    int m = stringlength(pattern);
+    if (startpos > l) error2(indexrange);
+    for (int i = startpos; i <= l-m; i++) {
+      int j = 0;
+      while (j < m && nthchar(target, i+j) == nthchar(pattern, j)) j++;
+      if (j == m) return number(i);
+    }
+    return nil;
+  } else error2("arguments are not both lists or strings");
+  return nil;
+}
+
 
 #if defined sdcardsupport
 /*
@@ -1737,6 +1770,9 @@ object *fn_MatrixSetRotation (object *args, object *env) {
 const char stringKeyboardGetKey[] PROGMEM = "keyboard-get-key";
 const char stringKeyboardFlush[] PROGMEM = "keyboard-flush";
 
+//String helper function from M5Cardputer editor version by hasn0life
+const char stringSearchStr[] PROGMEM = "search-str";
+
 #if defined sdcardsupport
 const char stringSDFileExists[] PROGMEM = "sd-file-exists";
 const char stringSDFileRemove[] PROGMEM = "sd-file-remove";
@@ -1845,6 +1881,12 @@ const char docKeyboardGetKey[] PROGMEM = "(keyboard-get-key [pressed])\n"
 "Get key last recognized - default: when released, if [pressed] is t: when pressed).";
 const char docKeyboardFlush[] PROGMEM = "(keyboard-flush)\n"
 "Discard missing key up/down events.";
+
+//String helper function from M5Cardputer editor version by hasn0life
+const char docSearchStr[] PROGMEM = "(search-str pattern target [startpos])\n"
+"Returns the index of the first occurrence of pattern in target, or nil if it's not found\n"
+"starting from startpos";
+
 #if defined sdcardsupport
 const char docSDFileExists[] PROGMEM = "(sd-file-exists filename)\n"
 "Returns t if filename exists on SD card, otherwise nil.";
@@ -2040,6 +2082,7 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
 
 { stringKeyboardGetKey, fn_KeyboardGetKey, 0201, docKeyboardGetKey },
 { stringKeyboardFlush, fn_KeyboardFlush, 0200, docKeyboardFlush },
+{ stringSearchStr, fn_searchstr, 0224, docSearchStr },
 
 #if defined sdcardsupport
   { stringSDFileExists, fn_SDFileExists, 0211, docSDFileExists },

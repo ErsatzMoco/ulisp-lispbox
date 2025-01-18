@@ -1,11 +1,12 @@
 /*
-  LispBox LispLibrary - Version 1.0 - June 2024
-  Hartmut Grawe - github.com/ersatzmoco - June 2024
+  LispBox LispLibrary - Version 1.1 - Jan 2025
+  Hartmut Grawe - github.com/ersatzmoco - Jan 2025
 
   Some parts based on:
   ErsatzMoco microcontroller framework - github.com/ersatzmoco/ersatzmoco
-  Hartmut Grawe - github.com/ersatzmoco - July 2020
-  Please see there for further explanations on how to use the framework.
+  	Hartmut Grawe - github.com/ersatzmoco - July 2020
+  	Please see there for further explanations on how to use the framework.
+  M5Cardputer editor version by hasn0life - Nov 2024 - https://github.com/hasn0life/ulisp-sedit-m5cardputer
 
   This uLisp version licensed under the MIT license: https://opensource.org/licenses/MIT
 */
@@ -942,7 +943,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 			(if myform
 				(progn
 					(setf se:funcname (prin1-to-string myform)) 
-					(setq se:buffer (split-string-to-list "~%" (string (with-output-to-string (str) (pprint (eval myform) t str)))))
+					(setq se:buffer (cdr (split-string-to-list (string #\Newline) (string (with-output-to-string (str) (pprint (eval myform) str))))))
 					(tft1-set-cursor (* 36 se:cwidth) 0)
 					(tft1-set-text-color se:code_col se:cursor_col)
 					(if (> (length se:funcname) 13)
@@ -1447,17 +1448,22 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
   (min (max value mini) maxi)
 )
 
+; Fn adopted from M5Cardputer editor version by hasn0life
+; recursion eliminated, requires search-str from extensions
 (defun split-string-to-list (delim str)
 	(unless (or (eq str nil) (not (stringp str))) 
-		(let ((pos (search delim str)))
-			(if (eq pos nil)
-				(list str)
-				(append (list (subseq str 0 pos))
-						(split-string-to-list delim (subseq str (+ pos (length delim))))
-				)
-			)
-		)
-	)
+		(let* ((start 0)
+          (end (search-str delim str))
+          (lst nil))
+			(loop
+        (if (eq end nil) 
+          (return (append lst (list (subseq str start))))
+				  (setq lst (append lst (list (subseq str start end)))))
+        (setq start (1+ end))
+        (setq end (search-str delim str start))
+      )
+    )
+  )
 )
 
 (defun char-list-to-string (clist)

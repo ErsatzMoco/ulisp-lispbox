@@ -270,9 +270,9 @@ volatile flags_t Flags = 1<<PRINTREADABLY; // Set by default
 // Forward references
 object *tee;
 void pfstring (const char *s, pfun_t pfun);
-inline void pln (pfun_t pfun, bool lispy = false);
-void superprint (object *form, int lm, pfun_t pfun, bool lispy = false);
-void supersub (object *form, int lm, int super, pfun_t pfun, bool lispy = false);
+inline void pln (pfun_t pfun);
+void superprint (object *form, int lm, pfun_t pfun);
+void supersub (object *form, int lm, int super, pfun_t pfun);
 
 // Error handling
 
@@ -2723,13 +2723,13 @@ bool highlighted (object *obj) {
 const char STX = 2; // Code to invert text
 const char ETX = 3; // Code to invert text
 
-void superprint (object *form, int lm, pfun_t pfun, bool lispy = false) {
+void superprint (object *form, int lm, pfun_t pfun) {
   if (atom(form)) {
     if (isbuiltin(form, NOTHING)) printsymbol(form, pfun);
     else printobject(form, pfun);
   } else if (quoted(form)) {
     pfun('\'');
-    superprint(car(cdr(form)), lm + 1, pfun, lispy);
+    superprint(car(cdr(form)), lm + 1, pfun);
   } else {
     lm = lm + PPINDENT;
     bool fits = (subwidth(form, ppwidth - lm - PPINDENT) >= 0);
@@ -2750,8 +2750,8 @@ void superprint (object *form, int lm, pfun_t pfun, bool lispy = false) {
         special--; 
       } else if (fits) {
         pfun(' ');
-      } else { pln(pfun, lispy); indent(lm, ' ', pfun); }
-      superprint(car(form), lm+extra, pfun, lispy);
+      } else { pln(pfun); indent(lm, ' ', pfun); }
+      superprint(car(form), lm+extra, pfun);
       form = cdr(form);
     }
     pfun(')');
@@ -4874,20 +4874,13 @@ object *fn_edit (object *args, object *env) {
 
 object *fn_pprint (object *args, object *env) {
   (void) env;
-  bool lispy = false;
-  pfun_t pfun = pstreamfun(NULL);
   object *obj = first(args);
-  args = cdr(args);
-  if (args != NULL) {
-    lispy = (first(args) == nil) ? false : true;
-    pfun = pstreamfun(cdr(args));
-  }
-
+  pfun_t pfun = pstreamfun(cdr(args));
   #if defined(gfxsupport)
   if (pfun == gfxwrite) ppwidth = GFXPPWIDTH;
   #endif
-  if (!lispy) pln(pfun, lispy);
-  superprint(obj, 0, pfun, lispy);
+  pln(pfun);
+  superprint(obj, 0, pfun);
   ppwidth = PPWIDTH;
   return bsymbol(NOTHING);
 }
@@ -6739,7 +6732,7 @@ const tbl_entry_t lookup_table[] = {
   { string205, fn_sleep, 0201, doc205 },
   { string206, fn_note, 0203, doc206 },
   { string207, fn_edit, 0211, doc207 },
-  { string208, fn_pprint, 0213, doc208 },
+  { string208, fn_pprint, 0212, doc208 },
   { string209, fn_pprintall, 0201, doc209 },
   { string210, fn_require, 0211, doc210 },
   { string211, fn_listlibrary, 0200, doc211 },
@@ -7432,14 +7425,8 @@ void pfloat (float f, pfun_t pfun) {
   }
 }
 
-inline void pln (pfun_t pfun, bool lispy = false) {
-  if (lispy) {
-    pfun('~');
-    pfun('%');
-  }
-  else {
-    pfun('\n');
-  }
+inline void pln (pfun_t pfun) {
+  pfun('\n');
 }
 
 void pfl (pfun_t pfun) {
