@@ -82,8 +82,9 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 ;
 ; Define a class
 (defun class (&optional parent slots constructor)
-  (let ((obj (when parent (list (cons 'parent parent)))))
-  	(when (and constructor parent)
+	#.(format nil "(class [parent] [slotlist] [constructor t/nil])~%ULOS function to define a new class or instance of a class.~%To define a new class, pass it to a variable, adding a list of property/method slots according to ULOS mechanism, optionally passing a parent class to inherit from.~%To define an instance, pass a parent class (= the prototype), omit the slots and set constructor to t.~%That way, the slots of the parent class are automatically copied into the instance.~%Setting the slots of the parent is equivalent to setting class variables, then.")
+	(let ((obj (when parent (list (cons 'parent parent))))) 	
+	 	(when (and constructor parent)
   		(when (symbolp parent) (setq parent (eval parent)))
   		(loop
 	     (when (null parent) (return parent))
@@ -100,6 +101,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 
 ; Get the value of a property slot in an instance/class or its parents
 (defun gtv (obj slot)
+	#.(format nil "(gtv obj 'slot)~%ULOS function to get value of property slot in obj.")
   (when (symbolp obj) (setq obj (eval obj)))
   (let ((pair (assoc slot obj)))
     (if pair (cdr pair)
@@ -110,6 +112,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 
 ; Update a property in an instance/class
 (defun stv (obj slot value)
+	#.(format nil "(stv obj 'slot value)~%ULOS function to set value of property slot in obj.")
   (when (symbolp obj) (setq obj (eval obj)))
   (let ((pair (assoc slot obj)))
     (when pair (setf (cdr pair) value))
@@ -118,6 +121,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 
 ; Add property and method slots
 (defun adp (obj slots)
+	#.(format nil "(adp 'obj slotlist)~%ULOS function to add new property slots to obj, similar to JavaScript mechanism.")
 	(let (newlist) 
     (loop
      (when (null slots) (return))
@@ -1056,8 +1060,8 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 		  (linelist nil)
 		  (text "")
 		  (line "")
-		  (headerlines 1)
-		  )
+		  (headerlines 1))
+
 		(if (< (length docstring) 1)
 			(progn 
 				(setf se:docline-array (make-array '(2 1)))
@@ -1130,12 +1134,9 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 		 (offset (floor (/ se:maxlines 2)))
 		 (refstr "")
 		 (prstr "")
-		 (ctr se:rctr)
-		 )
+		 (ctr se:rctr))
 
 		(when cctr (setf ctr cctr))
-		#| (when (> ctr (1- reflength)) (setf ctr (1- reflength)))
-		(when (< ctr 0) (setf ctr 0)) |#
 		(setf ctr (constrain ctr 0 (- reflength 1)))
 		(setf se:rctr ctr)
 
@@ -1181,13 +1182,10 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	(set-cursor 0 0)
 	(let ((dalength (second (array-dimensions se:docline-array)))
 		 (prstr "")
-		 (ctr se:dctr)
-		 (cold se:dctr)
-		 )
+		 (ctr se:dctr))
 		
 		(when cctr (setf ctr cctr))
-		(when (> ctr (min (- dalength se:maxlines) dalength)) (setf ctr (min (- dalength se:maxlines) dalength)))
-		(when (< ctr 0) (setf ctr 0))
+		(setf ctr (constrain ctr 0 (min (- dalength se:maxlines) dalength)))
 		(setf se:dctr ctr)
 
 		(dotimes (i (min se:maxlines dalength))
@@ -1367,7 +1365,8 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 		(defvar se:maxchar (floor (/ se:xsize se:cxsize)))
 
 		(let ((result nil)
-			  (esc nil))
+			  (esc nil)
+			  (dalength 0))
 
 			(fill-screen)
 			(set-cursor 0 0)
@@ -1412,7 +1411,8 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 					(unless result
 						(fill-screen)
 						(se:print-doc)
-						(setf result (se:eval-encoder se:dctr (second (array-dimensions se:docline-array)) se:print-doc se:insert-fun))
+						(setf dalength (second (array-dimensions se:docline-array)))
+						(setf result (se:eval-encoder se:dctr (constrain dalength 0 (min (- dalength se:maxlines) dalength)) se:print-doc se:insert-fun))
 						(when result
 							(when (= result 196)
 								(return)
@@ -1445,7 +1445,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 ;
 ;
 (defun constrain (value mini maxi)
-  (min (max value mini) maxi)
+  (max (min value maxi) mini)
 )
 
 ; Fn adopted from M5Cardputer editor version by hasn0life

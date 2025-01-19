@@ -4925,7 +4925,7 @@ object *fn_format (object *args, object *env) {
   object *save = NULL;
   args = cddr(args);
   int len = stringlength(formatstr);
-  uint8_t n = 0, width = 0, w, bra = 0;
+  uint16_t n = 0, width = 0, w, bra = 0;
   char pad = ' ';
   bool tilde = false, mute = false, comma = false, quote = false;
   while (n < len) {
