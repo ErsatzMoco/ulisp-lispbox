@@ -121,7 +121,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 
 ; Add property and method slots
 (defun adp (obj slots)
-	#.(format nil "(adp 'obj slotlist)~%ULOS function to add new property slots to obj, similar to JavaScript mechanism.")
+	#.(format nil "(adp 'obj slotlist)~%ULOS function to add new property/method slots to obj, similar to JavaScript mechanism.")
 	(let (newlist) 
     (loop
      (when (null slots) (return))
@@ -133,7 +133,8 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 
 ; Call a method in an object instance
 ;
-(defun cmt (obj method &rest arguments) 
+(defun cmt (obj method &rest arguments)
+	#.(format nil "(cmt obj 'method [arguments])~%ULOS function to call method of obj, providing a list of arguments.") 
 	(apply (eval (gtv obj method)) (append (list obj) arguments))
 )
 
@@ -143,12 +144,14 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 ;
 ;
 (defun rgb (r g b)
+	#.(format nil "(rgb r g b)~%Builds 16 bit color value from red, green and blue components provided as 8-bit integers.")
   (logior (ash (logand r #xf8) 8) (ash (logand g #xfc) 3) (ash b -3))
 )
 
 
 ;
 ; LispBox screen editor
+; Functions without built-in help to save memory.
 ;
 ;
 (defun se:init (sk)
@@ -934,6 +937,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun se:sedit (&optional myform myskin)
+	#.(format nil "(se:sedit ['symbol])~%Invoke fullscreen editor, optionally providing the name of a bound symbol to be edited.")
 	(se:init myskin)
 	(let* ((lkd nil)
 		   (lku nil)
@@ -1323,7 +1327,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 
 
 (defun se:help ()
-
+	#.(format nil "(se:help)~%Invoke Lispy Little Helper from REPL. Exit with F3 on USB keyboard.")
 	(when se:help-active
 		(defvar se:code_col (rgb 255 255 255))
 		(defvar se:line_col (rgb 90 90 90))
@@ -1445,12 +1449,14 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 ;
 ;
 (defun constrain (value mini maxi)
+	#.(format nil "(constrain value mini maxi)~%Constrain a value to interval between mini and maxi (including both).")
   (max (min value maxi) mini)
 )
 
 ; Fn adopted from M5Cardputer editor version by hasn0life
 ; recursion eliminated, requires search-str from extensions
 (defun split-string-to-list (delim str)
+	#.(format nil "(split-string-to-list delimiter str)~%Split string str into list, cutting it at delimiter.")
 	(unless (or (eq str nil) (not (stringp str))) 
 		(let* ((start 0)
           (end (search-str delim str))
@@ -1467,6 +1473,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun char-list-to-string (clist)
+	#.(format nil "(char-list-to-string clist)~%Build string from a list of characters.")
 	(let ((str "")) 
 		(dolist (c clist) (setq str (concatenate 'string str c))) 
 		str
@@ -1474,6 +1481,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun to-hex-char (i)
+	#.(format nil "(to-hex-char i)~%Convert number i (<= 15) to hex char.")
 	(unless (equal i nil)
 		(let ((i (abs i))) 
 			(code-char (+ i (if (<= i 9) 48 55)) )
@@ -1482,6 +1490,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun byte-to-hexstr (i)
+	#.(format nil "(byte-to-hexstr i)~%Convert number i (<= 255) to hex string.")
 	(unless (equal i nil)
 		(let ((i (abs i))) 
 		 (concatenate 'string (string (to-hex-char (ash i -4))) (string (to-hex-char (logand i 15))) ) 
@@ -1490,6 +1499,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun word-to-hexstr (i)
+	#.(format nil "(word-to-hexstr i)~%Convert number i (<= 65535) to hex string.")
 	(unless (equal i nil)
 		(let ((i (abs i))) 
 		 (concatenate 'string (byte-to-hexstr (ash i -8)) (byte-to-hexstr (logand i 255))) 
@@ -1498,22 +1508,27 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun hexstr-to-int (s)
+	#.(format nil "(hexstr-to-int str)~%Convert hex string to int.")
 	(read-from-string (concatenate 'string "#x" s))
 )
 
 (defun remove-if (fn lis)
+	#.(format nil "(remove-if fn lis)~%Remove list items when processing them with function fn evals to t.")
   (mapcan #'(lambda (item) (unless (funcall fn item) (list item))) lis)
  )
 
 (defun remove-if-not (fn lis)
+	#.(format nil "(remove-if-not fn lis)~%Remove list items when processing them with function fn evals to nil.")
   (mapcan #'(lambda (item) (when (funcall fn item) (list item))) lis)
 )
 
-(defun remove_item (ele lis)
+(defun remove-item (ele lis)
+	#.(format nil "(remove-item ele lis)~%Remove item ele from list.")
 	(remove-if (lambda (item) (equal ele item)) lis)
 )
 
 (defun remove (place lis)
+	#.(format nil "(remove n lis)~%Remove nth item from list.")
 	(let ((newlis ()))
 		(dotimes (i place)
 			(push (pop lis) newlis)
@@ -1527,6 +1542,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun assoc* (a alist test)
+	#.(format nil "(assoc* key list testfn)~%Looks up a key in an association list of (key . value) pairs, and returns *all* matching pairs as a list, or nil if no pair is found.")
   (cond
    ((null alist) nil)
    ((funcall test a (caar alist)) (car alist))
@@ -1535,6 +1551,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun reverse-assoc* (a alist test)
+	#.(format nil "(assoc* val list testfn)~%Looks up a value in an association list of (key . value) pairs, and returns *all* matching pairs as a list, or nil if no pair is found.")
   (cond
    ((null alist) nil)
    ((funcall test a (cdar alist)) (caar alist))
@@ -1543,6 +1560,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun get-obj (aname anum)
+	#.(format nil "(get-obj aname index)~%Retrieve numbered object by providing the root name and a number.")
 	(read-from-string (eval (concatenate 'string aname (string anum))))
 )
 
