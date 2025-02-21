@@ -10,20 +10,32 @@ partially compatible with EMACS:
 
 * CTRL-q / CTRL-c --- quit editor and return to REPL
 * CTRL-x / CTRL-b / CTRL-n --- discard current text buffer (i.e. new file)
-* CTRL-k / CTRL-l --- delete line starting at cursor position
+
+* CTRL-k / CTRL-l / ALT-x --- delete line starting at cursor position (deleted part is copied before)
+* ALT-c --- copy current line
+* ALT-v --- insert copy buffer at cursor position
+
+**Note:** ALT-v also serves as a rudimentary undo. If you accidentally delete part of a line using CTRL-k, CTRL-l or ALT-x you can insert that part again using ALT-v. 
+
 * CTRL-a / HOME --- move cursor to start of line
 * CTRL-e / END --- move cursor to end of line
 * ^ --- move cursor to beginning of buffer
 * PG UP/PG DOWN --- move one page up or down
 
 * F1 --- toggle bracket matching on/off
-* F2 --- check if bracket under the cursor has a matching bracket in the buffer. If so, they are temporarily highlighted. (Use when continuous bracket matching is off.)
+* F2 --- check whether bracket under the cursor has a matching bracket in the buffer. If so, both are temporarily highlighted. (Use when continuous bracket matching is off.)
+* F3 --- invoke "Lispy Little Helper" if applicable, see below
 * F5 --- bind contents of the text buffer to a symbol of your choice and quit editor
+* F8 --- save current buffer to backup file "BACKUP.CL" (overwriting old backup file). This is intended as a quick save function to prevent the worst case scenario of running out of battery before having saved your current work. It is recommended to use F8 at regular intervals.
 * F9 --- delete a file on the SD card
 * F10 --- save text buffer to SD card
 * F11 --- load text from SD card into buffer, discarding the present one
 * F12 --- show directory of SD card
 Note: file names for SD card follow the 8.3 standard and thus must be given in capital letters. 
+
+* ALT-0 to ALT-9 --- insert one of up to ten predefined snippets at cursor position
+The snippets are defined in function `se:init` and reside in the global variable `se:sniplist` during runtime of the editor. You may change them according to your needs in file "LispboxLibrary.h" (re-flash your MCU with this firmware after change).
+
 
 The editor is written in uLisp. To invoke it type
 

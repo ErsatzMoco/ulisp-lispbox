@@ -16,6 +16,10 @@
                      // CURRENTLY MANDATORY BECAUSE OF UNSOLVED ISSUES WITHIN RADIOHEAD LIBRARY --- USE LOWPOWERLAB LIBRARY FOR NOW.
 
 #include <Adafruit_NeoPixel.h>
+#if defined (RA8875_gfx)
+  #include <Wire.h>
+  #include <Adafruit_TSC2007.h>
+#endif
 #if defined oled_gfx
   #include <Wire.h>
   #include <U8g2lib.h>
@@ -35,6 +39,10 @@
 // #define NEOPIXEL_NUM 1      //uncomment these two lines when using external NeoPixels - fill in appropriate values
 // #define PIN_NEOPIXEL 11
 
+#if defined (RA8875_gfx)
+  Adafruit_TSC2007 touch;
+#endif
+
 #if defined(oled_gfx)
   U8G2_SH1106_128X64_NONAME_F_HW_I2C oled = U8G2_SH1106_128X64_NONAME_F_HW_I2C(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
 #endif
@@ -44,10 +52,10 @@
   #define FREQUENCY RF69_433MHZ
   #define ENCRYPTKEY "My@@@Encrypt@@@@" //exactly the same 16 characters/bytes on all nodes!
   #define IS_RFM69HCW true // set to 'true' only if you are using an RFM69HCW module like on Feather M0 Radio
-  #define RFM69_CS 8
-  #define RFM69_IRQ 3
-  #define RFM69_IRQN 3 // Pin 3 is IRQ 3!
-  #define RFM69_RST 4
+  #define RFM69_CS 37
+  #define RFM69_IRQ 36
+  #define RFM69_IRQN 36
+  #define RFM69_RST 35
 #endif
 
 
@@ -87,7 +95,8 @@
 */
 char translate_key (uint16_t temp, uint8_t mod) {
     #if defined(qwertz)
-    char kout = 0;
+    unsigned char kout = 0;
+    //Serial.print(mod); Serial.print(" "); Serial.println(temp);
     switch (temp) {
       case 96: kout = '^'; break;
       case 93: 
@@ -150,6 +159,9 @@ char translate_key (uint16_t temp, uint8_t mod) {
           if (mod == 0x40) {
             kout = '{';
           }
+          else if (mod == 4) {
+            kout = 247;
+          }
           else {
             kout = temp;
           } 
@@ -157,6 +169,9 @@ char translate_key (uint16_t temp, uint8_t mod) {
       case 56:
           if (mod == 0x40) {
             kout = '[';
+          }
+          else if (mod == 4) {
+            kout = 248;
           }
           else {
             kout = temp;
@@ -166,6 +181,9 @@ char translate_key (uint16_t temp, uint8_t mod) {
           if (mod == 0x40) {
             kout = ']';
           }
+          else if (mod == 4) {
+            kout = 249;
+          }
           else {
             kout = temp;
           } 
@@ -173,6 +191,9 @@ char translate_key (uint16_t temp, uint8_t mod) {
       case 48:
           if (mod == 0x40) {
             kout = '}';
+          }
+          else if (mod == 4) {
+            kout = 240;
           }
           else {
             kout = temp;
@@ -191,6 +212,32 @@ char translate_key (uint16_t temp, uint8_t mod) {
       case 45:
           if (mod == 0x40) kout = '\\'; break;
 
+      case 99:
+          if (mod == 4) kout = 251; break;
+
+      case 118:
+          if (mod == 4) kout = 252; break;
+
+      case 120:
+          if (mod == 4) kout = 253; break;
+
+      case 49:
+          if (mod == 4) kout = 241; break;
+
+      case 50:
+          if (mod == 4) kout = 242; break;
+
+      case 51:
+          if (mod == 4) kout = 243; break;
+
+      case 52:
+          if (mod == 4) kout = 244; break;
+
+      case 53:
+          if (mod == 4) kout = 245; break;
+
+      case 54:
+          if (mod == 4) kout = 246; break;
 
       default: kout = temp; break;
     }
@@ -991,6 +1038,77 @@ object *fn_TFT1ReadStatus (object *args, object *env) {
   tft1.readStatus();
   return nil;
 }
+
+
+//
+// Touch screen routines for use with RA8875 and TSC2007 controller
+// Replace "Wire2" and address in touch.begin according to your config if necessary
+//
+
+/*
+  (touch-begin)
+  Initialize touch screen controller.
+*/
+object *fn_TouchBegin (object *args, object *env) {
+  (void) args, (void) env;
+  if (touch.begin(0x48, &Wire2)) {
+    return tee;
+  }
+  else {
+    return nil;
+  }
+}
+
+/*
+  (touch-get-point)
+  Return touched x,y position as a list.
+*/
+object *fn_TouchGetPoint (object *args, object *env) {
+  (void) args, (void) env;
+
+  uint16_t x, y, z1, z2;
+  if (touch.read_touch(&x, &y, &z1, &z2)) {
+    //int myx = map(p.y, TS_MINX, TS_MAXX, 0, tft.width());
+    //int myy = map(p.x, TS_MINY, TS_MAXY, tft.height(), 0);
+    int myx = x;
+    int myy = y;
+
+    object *px = number(myx);
+    object *py = number(myy);
+    object *pz1 = number(z1);
+    object *pz2 = number(z2);
+
+    return cons(px, cons(py, cons(pz1, cons(pz2, NULL))));
+  }
+  else {
+    return nil;
+  }
+}
+
+
+/*
+  (touch-wait-for-touch)
+  Wait for touch screen response and return touched x,y position as a list.
+  Convenience function, not included in driver. (Blocking!)
+*/
+object *fn_TouchWaitForTouch (object *args, object *env) {
+  (void) args, (void) env;
+
+  uint16_t x, y, z1, z2;
+  while (!touch.read_touch(&x, &y, &z1, &z2));
+  //int myx = map(p.y, TS_MINX, TS_MAXX, 0, tft.width());
+  //int myy = map(p.x, TS_MINY, TS_MAXY, tft.height(), 0);
+  int myx = x;
+  int myy = y;
+
+  object *px = number(myx);
+  object *py = number(myy);
+  object *pz1 = number(z1);
+  object *pz2 = number(z2);
+
+  return cons(px, cons(py, cons(pz1, cons(pz2, NULL))));
+}
+
 
 #endif
 
@@ -1826,6 +1944,10 @@ const char stringTFT1ReadData[] PROGMEM = "tft1-read-data";
 const char stringTFT1WriteData[] PROGMEM = "tft1-write-data";
 const char stringTFT1ReadStatus[] PROGMEM = "tft1-read-status";
 const char stringTFT1WriteCommand[] PROGMEM = "tft1-write-command";
+
+const char stringTouchBegin[] PROGMEM = "touch-begin";
+const char stringTouchGetPoint[] PROGMEM = "touch-get-point";
+const char stringTouchWaitForTouch[] PROGMEM = "touch-wait-for-touch";
 #endif
 
 #if defined(oled_gfx)
@@ -1995,6 +2117,13 @@ const char docTFT1WriteCommand[] PROGMEM = "(tft1-write-command c)\n"
 "Low-level access: Write command c.";
 const char docTFT1ReadStatus[] PROGMEM = "(tft1-read-status)\n"
 "Low-level access: Read status.";
+
+const char docTouchBegin[] PROGMEM = "(touch-begin)\n"
+"Initialize touch screen controller.";
+const char docTouchGetPoint[] PROGMEM = "(touch-get-point)\n"
+"Return touched x,y position as a list.";
+const char docTouchWaitForTouch[] PROGMEM = "(touch-wait-for-touch)\n"
+"Wait for touch screen response and return touched x,y position as a list.\n";
 #endif
 
 #if defined(oled_gfx)
@@ -2137,6 +2266,10 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringTFT1ReadData, fn_TFT1ReadData, 0200, docTFT1ReadData },
   { stringTFT1WriteCommand, fn_TFT1WriteCommand, 0211, docTFT1WriteCommand },
   { stringTFT1ReadStatus, fn_TFT1ReadStatus, 0200, docTFT1ReadStatus },
+
+  { stringTouchBegin, fn_TouchBegin, 0200, docTouchBegin },
+  { stringTouchGetPoint, fn_TouchGetPoint, 0200, docTouchGetPoint },
+  { stringTouchWaitForTouch, fn_TouchWaitForTouch, 0200, docTouchWaitForTouch },
 #endif
 
 #if defined(oled_gfx)

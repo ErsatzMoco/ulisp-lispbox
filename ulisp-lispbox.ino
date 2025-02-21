@@ -28,7 +28,7 @@
 // #define vt100
 #define extensions
 #define RA8875_gfx
-#define oled_gfx
+// #define oled_gfx //uncomment this line to enable extension for OLED display at default I2C
 // #define rfm69 //uncomment this line for FEATHER M0 RADIO with RFM69 module
 // #define servolib  //uncomment this line to include Arduino "Servo" library into extension
 // #define matrixlib //uncomment this line to include Adafruit 8x16 LED matrix library into extension
@@ -2249,8 +2249,12 @@ void I2Cstop (TwoWire *port, uint8_t read) {
   || defined(ARDUINO_GRAND_CENTRAL_M4) || defined(ARDUINO_NRF52840_CIRCUITPLAY)
 #define ULISP_I2C1
 #endif
-#if defined(ARDUINO_SAM_DUE) || defined(ARDUINO_TEENSY40) || defined(ARDUINO_TEENSY41)
-#define ULISP_SERIAL3
+#if defined(ARDUINO_SAM_DUE)
+#define ULISP_SERIAL3 
+#elif defined (ARDUINO_TEENSY40)
+#define ULISP_SERIAL5
+#elif defined(ARDUINO_TEENSY41)
+#define ULISP_SERIAL8
 #elif defined(ARDUINO_RASPBERRY_PI_PICO) || defined(ARDUINO_RASPBERRY_PI_PICO_W) \
   || defined(ARDUINO_RASPBERRY_PI_PICO_2) || defined(ARDUINO_PIMORONI_PICO_PLUS_2)
 #define ULISP_SERIAL2
@@ -2269,15 +2273,33 @@ inline int i2cread () { return I2Cread(&Wire); }
 #if defined(ULISP_I2C1)
 inline int i2c1read () { return I2Cread(&Wire1); }
 #endif
-#if defined(ULISP_SERIAL3)
+
+#if defined(ULISP_SERIAL8)
+inline int serial8read () { unsigned long mymil = millis(); while (!Serial8.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial8.read(); }
+inline int serial7read () { unsigned long mymil = millis(); while (!Serial7.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial7.read(); }
+inline int serial6read () { unsigned long mymil = millis(); while (!Serial6.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial6.read(); }
+inline int serial5read () { unsigned long mymil = millis(); while (!Serial5.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial5.read(); }
+inline int serial4read () { unsigned long mymil = millis(); while (!Serial4.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial4.read(); }
 inline int serial3read () { unsigned long mymil = millis(); while (!Serial3.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial3.read(); }
-#endif
-#if defined(ULISP_SERIAL3) || defined(ULISP_SERIAL2)
 inline int serial2read () { unsigned long mymil = millis(); while (!Serial2.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial2.read(); }
-#endif
-#if defined(ULISP_SERIAL3) || defined(ULISP_SERIAL2) || defined(ULISP_SERIAL1)
+inline int serial1read () { unsigned long mymil = millis(); while (!Serial1.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial1.read(); }
+#elif defined(ULISP_SERIAL5)
+inline int serial5read () { unsigned long mymil = millis(); while (!Serial5.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial5.read(); }
+inline int serial4read () { unsigned long mymil = millis(); while (!Serial4.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial4.read(); }
+inline int serial3read () { unsigned long mymil = millis(); while (!Serial3.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial3.read(); }
+inline int serial2read () { unsigned long mymil = millis(); while (!Serial2.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial2.read(); }
+inline int serial1read () { unsigned long mymil = millis(); while (!Serial1.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial1.read(); }
+#elif defined(ULISP_SERIAL3)
+inline int serial3read () { unsigned long mymil = millis(); while (!Serial3.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial3.read(); }
+inline int serial2read () { unsigned long mymil = millis(); while (!Serial2.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial2.read(); }
+inline int serial1read () { unsigned long mymil = millis(); while (!Serial1.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial1.read(); }
+#elif defined(ULISP_SERIAL2)
+inline int serial2read () { unsigned long mymil = millis(); while (!Serial2.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial2.read(); }
+inline int serial1read () { unsigned long mymil = millis(); while (!Serial1.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial1.read(); }
+#elif defined(ULISP_SERIAL1)
 inline int serial1read () { unsigned long mymil = millis(); while (!Serial1.available() && (millis() < (mymil + SERIAL_TIMEOUT))) testescape(); return Serial1.read(); }
 #endif
+
 #if defined(sdcardsupport)
 File SDpfile, SDgfile;
 inline int SDread () {
@@ -2306,36 +2328,77 @@ inline int WiFiread () {
 #endif
 
 void serialbegin (int address, int baud) {
-  #if defined(ULISP_SERIAL3)
+
+  #if defined(ULISP_SERIAL8)
   if (address == 1) Serial1.begin((long)baud*100);
   else if (address == 2) Serial2.begin((long)baud*100);
   else if (address == 3) Serial3.begin((long)baud*100);
+  else if (address == 4) Serial4.begin((long)baud*100);
+  else if (address == 5) Serial5.begin((long)baud*100);
+  else if (address == 6) Serial6.begin((long)baud*100);
+  else if (address == 7) Serial7.begin((long)baud*100);
+  else if (address == 8) Serial8.begin((long)baud*100);
+  else error("port not supported", number(address));
+  #elif defined(ULISP_SERIAL5)
+  if (address == 1) Serial1.begin((long)baud*100);
+  else if (address == 2) Serial2.begin((long)baud*100);
+  else if (address == 3) Serial3.begin((long)baud*100);
+  else if (address == 4) Serial4.begin((long)baud*100);
+  else if (address == 5) Serial5.begin((long)baud*100);
+  else error("port not supported", number(address));
+  #elif defined(ULISP_SERIAL3)
+  if (address == 1) Serial1.begin((long)baud*100);
+  else if (address == 2) Serial2.begin((long)baud*100);
+  else if (address == 3) Serial3.begin((long)baud*100);
+  else error("port not supported", number(address));
   #elif defined(ULISP_SERIAL2)
   if (address == 1) Serial1.begin((long)baud*100);
   else if (address == 2) Serial2.begin((long)baud*100);
+  else error("port not supported", number(address));
   #elif defined(ULISP_SERIAL1)
   if (address == 1) Serial1.begin((long)baud*100);
+  else error("port not supported", number(address));
   #else
   (void) baud;
-  if (false);
+  error("port not supported", number(address));
   #endif
-  else error("port not supported", number(address));
+
 }
 
 void serialend (int address) {
-  #if defined(ULISP_SERIAL3)
-  if (address == 1) {Serial1.flush(); Serial1.end(); }
-  else if (address == 2) {Serial2.flush(); Serial2.end(); }
-  else if (address == 3) {Serial3.flush(); Serial3.end(); }
-  #elif defined(ULISP_SERIAL2)
-  if (address == 1) {Serial1.flush(); Serial1.end(); }
-  else if (address == 2) {Serial2.flush(); Serial2.end(); }
-  #elif defined(ULISP_SERIAL1)
-  if (address == 1) {Serial1.flush(); Serial1.end(); }
-  #else
-  if (false);
-  #endif
+
+  #if defined(ULISP_SERIAL8)
+  if (address == 1) { Serial1.flush(); Serial1.end(); }
+  else if (address == 2) { Serial2.flush(); Serial2.end(); }
+  else if (address == 3) { Serial3.flush(); Serial3.end(); }
+  else if (address == 4) { Serial4.flush(); Serial4.end(); }
+  else if (address == 5) { Serial5.flush(); Serial5.end(); }
+  else if (address == 6) { Serial6.flush(); Serial6.end(); }
+  else if (address == 7) { Serial7.flush(); Serial7.end(); }
+  else if (address == 8) { Serial8.flush(); Serial8.end(); }
   else error("port not supported", number(address));
+  #elif defined(ULISP_SERIAL5)
+  if (address == 1) { Serial1.flush(); Serial1.end(); }
+  else if (address == 2) { Serial2.flush(); Serial2.end(); }
+  else if (address == 3) { Serial3.flush(); Serial3.end(); }
+  else if (address == 4) { Serial4.flush(); Serial4.end(); }
+  else if (address == 5) { Serial5.flush(); Serial5.end(); }
+  else error("port not supported", number(address));
+  #elif defined(ULISP_SERIAL3)
+  if (address == 1) { Serial1.flush(); Serial1.end(); }
+  else if (address == 2) { Serial2.flush(); Serial2.end(); }
+  else if (address == 3) { Serial3.flush(); Serial3.end(); }
+  else error("port not supported", number(address));
+  #elif defined(ULISP_SERIAL2)
+  if (address == 1) { Serial1.flush(); Serial1.end(); }
+  else if (address == 2) { Serial2.flush(); Serial2.end(); }
+  else error("port not supported", number(address));
+  #elif defined(ULISP_SERIAL1)
+  if (address == 1) { Serial1.flush(); Serial1.end(); };
+  else error("port not supported", number(address));
+  #else
+  error("port not supported", number(address));
+  #endif
 }
 
 gfun_t gstreamfun (object *args) {
@@ -2359,13 +2422,28 @@ gfun_t gstreamfun (object *args) {
   }
   else if (streamtype == SERIALSTREAM) {
     if (address == 0) gfun = gserial;
-    #if defined(ULISP_SERIAL3)
-    else if (address == 1) gfun = serial1read;
-    else if (address == 2) gfun = serial2read;
+    #if defined(ULISP_SERIAL8)
+    else if (address == 8) gfun = serial8read;
+    else if (address == 7) gfun = serial7read;
+    else if (address == 6) gfun = serial6read;
+    else if (address == 5) gfun = serial5read;
+    else if (address == 4) gfun = serial4read;
     else if (address == 3) gfun = serial3read;
-    #elif defined(ULISP_SERIAL2)
-    else if (address == 1) gfun = serial1read;
     else if (address == 2) gfun = serial2read;
+    else if (address == 1) gfun = serial1read;
+    #elif defined(ULISP_SERIAL5)
+    else if (address == 5) gfun = serial5read;
+    else if (address == 4) gfun = serial4read;
+    else if (address == 3) gfun = serial3read;
+    else if (address == 2) gfun = serial2read;
+    else if (address == 1) gfun = serial1read;
+    #elif defined(ULISP_SERIAL3)
+    else if (address == 3) gfun = serial3read;
+    else if (address == 2) gfun = serial2read;
+    else if (address == 1) gfun = serial1read;
+    #elif defined(ULISP_SERIAL2)
+    else if (address == 2) gfun = serial2read;
+    else if (address == 1) gfun = serial1read;
     #elif defined(ULISP_SERIAL1)
     else if (address == 1) gfun = serial1read;
     #endif
@@ -2388,10 +2466,25 @@ inline void i2cwrite (char c) { I2Cwrite(&Wire, c); }
 #if defined(ULISP_I2C1)
 inline void i2c1write (char c) { I2Cwrite(&Wire1, c); }
 #endif
-#if defined(ULISP_SERIAL3)
+#if defined(ULISP_SERIAL8)
 inline void serial1write (char c) { Serial1.write(c); }
 inline void serial2write (char c) { Serial2.write(c); }
 inline void serial3write (char c) { Serial3.write(c); }
+inline void serial4write (char c) { Serial4.write(c); }
+inline void serial5write (char c) { Serial5.write(c); }
+inline void serial6write (char c) { Serial6.write(c); }
+inline void serial7write (char c) { Serial7.write(c); }
+inline void serial8write (char c) { Serial8.write(c); }
+#elif defined(ULISP_SERIAL5)
+inline void serial1write (char c) { Serial1.write(c); }
+inline void serial2write (char c) { Serial2.write(c); }
+inline void serial3write (char c) { Serial3.write(c); }
+inline void serial4write (char c) { Serial4.write(c); }
+inline void serial5write (char c) { Serial5.write(c); }
+#elif defined(ULISP_SERIAL3)
+inline void serial3write (char c) { Serial3.write(c); }
+inline void serial2write (char c) { Serial2.write(c); }
+inline void serial1write (char c) { Serial1.write(c); }
 #elif defined(ULISP_SERIAL2)
 inline void serial2write (char c) { Serial2.write(c); }
 inline void serial1write (char c) { Serial1.write(c); }
@@ -2428,7 +2521,22 @@ pfun_t pstreamfun (object *args) {
     #endif
   } else if (streamtype == SERIALSTREAM) {
     if (address == 0) pfun = pserial;
-    #if defined(ULISP_SERIAL3)
+    #if defined(ULISP_SERIAL8)
+    else if (address == 1) pfun = serial1write;
+    else if (address == 2) pfun = serial2write;
+    else if (address == 3) pfun = serial3write;
+    else if (address == 4) pfun = serial4write;
+    else if (address == 5) pfun = serial5write;
+    else if (address == 6) pfun = serial6write;
+    else if (address == 7) pfun = serial7write;
+    else if (address == 8) pfun = serial8write;
+    #elif defined(ULISP_SERIAL5)
+    else if (address == 1) pfun = serial1write;
+    else if (address == 2) pfun = serial2write;
+    else if (address == 3) pfun = serial3write;
+    else if (address == 4) pfun = serial4write;
+    else if (address == 5) pfun = serial5write;
+    #elif defined(ULISP_SERIAL3)
     else if (address == 1) pfun = serial1write;
     else if (address == 2) pfun = serial2write;
     else if (address == 3) pfun = serial3write;
@@ -8084,18 +8192,18 @@ void initgfx () {
   #if defined(RA8875_gfx)
     if (!tft1.begin(RA8875_800x480)) {
       Serial.println("RA8875 Not Found!");
-      return nil;
     }
-    
-    tft1.displayOn(true);
-    tft1.GPIOX(true);      // Enable TFT - display enable tied to GPIOX
-    tft1.PWM1config(true, RA8875_PWM_CLK_DIV1024); // PWM output for backlight
-    tft1.PWM1out(255);
-    scanDirection(true, true); // override false rotation attempt of Adafruit RA8875 library - (true, true) rotates 180 degrees
-    tft1.fillScreen(RA8875_BLACK);
-    tft1.textMode();
-    tft1.setScrollWindow(0, 0, 799, 479, RA8875_SCROLL_BOTH);
-    tft1.scrollY((Leading * Scroll) - 1);
+    else {
+      tft1.displayOn(true);
+      tft1.GPIOX(true);      // Enable TFT - display enable tied to GPIOX
+      tft1.PWM1config(true, RA8875_PWM_CLK_DIV1024); // PWM output for backlight
+      tft1.PWM1out(255);
+      scanDirection(true, true); // override false rotation attempt of Adafruit RA8875 library - (true, true) rotates 180 degrees
+      tft1.fillScreen(RA8875_BLACK);
+      tft1.textMode();
+      tft1.setScrollWindow(0, 0, 799, 479, RA8875_SCROLL_BOTH);
+      tft1.scrollY((Leading * Scroll) - 1);
+    }
   #endif
 
   #if defined(gfxsupport)
