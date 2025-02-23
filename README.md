@@ -1,4 +1,4 @@
-# ulisp-lispbox
+# ulisp-lispbox --- Firmware for LispBox and LispDeck
 Modified version of ulisp-arm (see below) for use with a self-contained uLisp computer based on the Teensy 4.1, a TFT screen with RA8875 controller and touchscreen support (if applicable) and an USB keyboard. The REPL works locally and via serial connection simultaneously and prints to the TFT as well.
 
 **ADDENDUM:** Added "Lispy Little Helper", please see below screenshot
@@ -67,6 +67,7 @@ If you type a starting letter in the help text (or in the list) instead, the cor
 
 To use it in the REPL, enter `(se:help)` [Enter] - the rest works as described. With one exception: when you press the encoder in the help text, the function prototype will not be output. Instead, the lexicon remembers all function prototypes you view and outputs them when you exit the helper (also with "F3") as feedback in the REPL, so you have them as a reminder and can type them accordingly if needed.
 
+![LispDeck](LispDeck.jpg)
 ![Lispy Little Helper](LispyLittleHelper.jpg)
 
 Lisp Box firmware is based on ulisp-arm by David Johnson-Davies:
