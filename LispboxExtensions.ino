@@ -213,31 +213,85 @@ char translate_key (uint16_t temp, uint8_t mod) {
           if (mod == 0x40) kout = '\\'; break;
 
       case 99:
-          if (mod == 4) kout = 251; break;
+          if (mod == 4) {
+            kout = 251;
+          }
+          else {
+            kout = temp;
+          } 
+          break;
 
       case 118:
-          if (mod == 4) kout = 252; break;
+          if (mod == 4) {
+            kout = 252;
+          }
+          else {
+            kout = temp;
+          } 
+          break;
 
       case 120:
-          if (mod == 4) kout = 253; break;
+          if (mod == 4) {
+            kout = 253;
+            }
+          else {
+            kout = temp;
+          } 
+          break;
 
       case 49:
-          if (mod == 4) kout = 241; break;
+          if (mod == 4) {
+            kout = 241;
+          }
+          else {
+            kout = temp;
+          } 
+          break;
 
       case 50:
-          if (mod == 4) kout = 242; break;
+          if (mod == 4) {
+            kout = 242;
+          }
+          else {
+            kout = temp;
+          } 
+          break;
 
       case 51:
-          if (mod == 4) kout = 243; break;
+          if (mod == 4) {
+            kout = 243;
+          }
+          else {
+            kout = temp;
+          }
+          break;
 
       case 52:
-          if (mod == 4) kout = 244; break;
+          if (mod == 4) {
+            kout = 244;
+          }
+          else {
+            kout = temp;
+          } 
+          break;
 
       case 53:
-          if (mod == 4) kout = 245; break;
+          if (mod == 4) {
+            kout = 245;
+          }
+          else {
+            kout = temp;
+          }
+          break;
 
       case 54:
-          if (mod == 4) kout = 246; break;
+          if (mod == 4) {
+            kout = 246;
+          }
+          else {
+            kout = temp;
+          } 
+          break;
 
       default: kout = temp; break;
     }
