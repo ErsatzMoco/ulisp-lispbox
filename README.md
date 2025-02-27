@@ -47,9 +47,11 @@ The editor is written in uLisp. To invoke it type
 
 The Lisp Library of the Lisp Box now contains "Lispy Little Helper". This is a gadget using a KY-040 rotary encoder and a small second TFT display with ST7735 driver chip (see photo below, encoder on the right placed behind and below the Teensy). The default settings use a resolution of 160x128 pixels.
 
-The Lispy Little Helper collects built-in help information of uLisp symbols as a kind of virtual Rolodex lexicon, accessible from the REPL and the fullscreen editor as well. 
+The Lispy Little Helper collects built-in help information of uLisp symbols as a kind of virtual Rolodex lexicon, accessible from the REPL and the fullscreen editor as well.
 
 *If you do not intend to use this addendum, please set variable "se:help-active" to nil. This is done either by modifying the first active line of the Lisp Library (file LispboxLibrary.h) before uploading the firmware to your Teensy or by executing (setf se:help-active nil) in the REPL after startup.*
+
+**When `se:help-active` is set to `t`, the rotary encoder also controls vertical movement of the cursor in the fullscreen editor, as an alternative to the up/down cursor keys.**
 
 If you want to add the Lispy Little Helper to your Lisp Box, connect the rotary encoder and the display to the following pins (you may change them within the function `se:help`):
 
@@ -67,8 +69,8 @@ If you type a starting letter in the help text (or in the list) instead, the cor
 
 To use it in the REPL, enter `(se:help)` [Enter] - the rest works as described. With one exception: when you press the encoder in the help text, the function prototype will not be output. Instead, the lexicon remembers all function prototypes you view and outputs them when you exit the helper (also with "F3") as feedback in the REPL, so you have them as a reminder and can type them accordingly if needed.
 
-![LispDeck](LispDeck.jpg)
 ![Lispy Little Helper](LispyLittleHelper.jpg)
+![LispDeck](LispDeck.jpg)
 
 Lisp Box firmware is based on ulisp-arm by David Johnson-Davies:
 # ulisp-arm

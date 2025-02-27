@@ -191,7 +191,18 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	(defvar se:lastmatch ())
 	(defvar se:match nil)
 	(defvar se:exit nil)
-	(defvar se:rot-event nil)
+
+	(when se:help-active
+		(defvar se:CLK 16)
+		(defvar se:DT 14)
+		(defvar se:SW 20)
+		(pinmode se:CLK nil)
+		(pinmode se:DT nil)
+		(pinmode se:SW nil)
+
+		(defvar se:sw-state t)
+		(defvar se:clk-state (digitalread se:CLK))
+	)
 
 	(fill-screen)
 	(set-cursor 0 0)
@@ -996,7 +1007,10 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 		   (kdelay 500)
 		   (repcnt nil)
 		   (newkey nil)
-		   (krepeat nil))
+		   (krepeat nil)
+		   (pollenc nil)
+		   (numrot 0))
+
 			(if myform
 				(progn
 					(setf se:funcname (prin1-to-string myform)) 
@@ -1014,6 +1028,21 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 			(se:show-text)
 			(se:show-cursor)
 			(loop
+				(when se:help-active
+					(setf pollenc (second (se:poll-encoder)))
+					(when pollenc
+						(if (= numrot 1)
+							(progn
+								(if (equal pollenc "CW")
+									(se:up)
+									(se:down)
+								)
+								(setf numrot 0)
+							)
+							(setf numrot (1+ numrot))
+						)
+					)
+				)
 				(setf lkd (keyboard-get-key t))
 				(when (and lkd (not (equal lkd lastkey))) (setf lastkey lkd) (setf repcnt (millis)) (setf newkey t) (setf krepeat nil))
 				(when lastkey
@@ -1259,6 +1288,26 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	)
 )
 
+(defun se:poll-encoder ()
+	(let ((sw-event nil)
+				(rot-event nil))
+			(unless (eq (digitalread se:SW) se:sw-state)
+				(delay 2)
+				(setf se:sw-state (digitalread se:SW))
+				(setf sw-event t)
+			)
+
+			(unless (eq (digitalread se:CLK) se:clk-state)
+        (delay 1)
+				(setf se:clk-state (digitalread se:CLK))
+				(if (eq (digitalread se:CLK) (digitalread se:DT))
+					(setf rot-event "CCW")
+					(setf rot-event "CW")
+				)
+			)
+		(list sw-event rot-event)
+	)
+)
 
 (defun se:wait-encoder ()
 	(keyboard-flush)
