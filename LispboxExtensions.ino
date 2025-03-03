@@ -385,9 +385,11 @@ object *fn_SDFileExists (object *args, object *env) {
   cstring(first(args), fnbuf, slength);
 
   if (SD.exists(fnbuf)) {
+    free(fnbuf);
     return tee;
   }
   else {
+    free(fnbuf);
     return nil;
   }
 }
@@ -406,9 +408,11 @@ object *fn_SDFileRemove (object *args, object *env) {
 
   if (SD.exists(fnbuf)) {
     SD.remove(fnbuf);
+    free(fnbuf);
     return tee;
   }
   else {
+    free(fnbuf);
     return nil;
   }
 }
@@ -995,7 +999,7 @@ object *fn_TFT1FillTriangle (object *args, object *env) {
 }
 
 /*
-  (tft1-draw-curve)
+  (tft1-draw-curve x y long short curve)
   Draw curve at position x y with long arm, short arm and curve part.
 */
 object *fn_TFT1DrawCurve (object *args, object *env) {
@@ -1008,7 +1012,7 @@ object *fn_TFT1DrawCurve (object *args, object *env) {
 }
 
 /*
-  (tft1-fill-curve)
+  (tft1-fill-curve x y long short curve)
   Fill curve at position x y with long arm, short arm and curve part.
 */
 object *fn_TFT1FillCurve (object *args, object *env) {
@@ -1032,9 +1036,93 @@ object *fn_TFT1FillScreen (object *args, object *env) {
   return nil;
 }
 
+/*
+  Helper function: Read BGR-Pixel from BMP and convert it to RGB 565 (16 bit) color value
+*/
+uint16_t readBGR(File file) {
+  int b = file.read();
+  int g = file.read();
+  int r = file.read();
+
+  return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+} 
+
 
 /*
-  (tft1-write-reg)
+  (tft1-load-image fname x y)
+  Opens file fname from SD if it exits and displays it on screen at position x y.
+*/
+object *fn_TFT1LoadImage (object *args, object *env) {
+  (void) args, (void) env;
+
+  SD.begin(SDCARD_SS_PIN);
+
+  int slength = stringlength(checkstring(first(args)))+1;
+  char *fnbuf = (char*)malloc(slength);
+  cstring(first(args), fnbuf, slength);
+  File file;
+
+  if (!SD.exists(fnbuf)) {
+    pfstring("File not found", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+  int x = checkinteger(second(args));
+  int y = checkinteger(third(args));
+  (void) args;
+
+  char buffer[BUFFERSIZE];
+  file = SD.open(fnbuf);
+  if (!file) { 
+    pfstring("Problem reading from SD card", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  char b = file.read();
+  char m = file.read();
+  if ((m != 77) || (b != 66)) {
+    pfstring("No BMP file", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  file.seek(10);
+  uint32_t offset = SDRead32(file);
+  SDRead32(file);
+  int32_t width = SDRead32(file);
+  int32_t height = SDRead32(file);
+  int zpad = 0;
+  if ((width % 4) > 0) {
+    zpad = (4 - ((width * 3) % 4));
+  }
+  uint16_t linearr[width];
+
+  file.seek(offset);
+
+  tft1.graphicsMode();
+
+  for (int ly = (y + height - 1); ly >= y; ly--) {
+    for (int lx = 0; lx < width; lx++) {
+      linearr[lx] = readBGR(file);
+    }
+    tft1.drawPixels(linearr, width, x, ly);
+    //ignore trailing zero bytes
+    if (zpad > 0) {
+      for (int i = 0; i < zpad; i++) {
+        file.read();
+      }
+    }
+  }
+  
+  file.close();
+  free(fnbuf);
+  return nil;
+}
+
+
+/*
+  (tft1-write-reg reg)
   Low-level access: Write val to register reg.
 */
 object *fn_TFT1WriteReg (object *args, object *env) {
@@ -1044,7 +1132,7 @@ object *fn_TFT1WriteReg (object *args, object *env) {
 }
 
 /*
-  (tft1-read-reg)
+  (tft1-read-reg reg)
   Low-level access: Read register reg.
 */
 object *fn_TFT1ReadReg (object *args, object *env) {
@@ -1054,7 +1142,7 @@ object *fn_TFT1ReadReg (object *args, object *env) {
 }
 
 /*
-  (tft1-write-data)
+  (tft1-write-data d)
   Low-level access: Write data d.
 */
 object *fn_TFT1WriteData (object *args, object *env) {
@@ -1074,7 +1162,7 @@ object *fn_TFT1ReadData (object *args, object *env) {
 }
 
 /*
-  (tft1-write-command)
+  (tft1-write-command c)
   Low-level access: Write command c.
 */
 object *fn_TFT1WriteCommand (object *args, object *env) {
@@ -1093,6 +1181,16 @@ object *fn_TFT1ReadStatus (object *args, object *env) {
   return nil;
 }
 
+/*
+  (tft1-set-backlight level)
+  Set backlight to level [0-255].
+*/
+object *fn_TFT1SetBacklight (object *args, object *env) {
+  (void) env;
+  uint8_t level = constrain(checkinteger(first(args)), 0, 255);
+  tft1.PWM1out(level);
+  return nil;
+}
 
 //
 // Touch screen routines for use with RA8875 and TSC2007 controller
@@ -1635,7 +1733,7 @@ object *fn_RFM69GetRSSI (object *args, object *env) {
 
 #if defined(servolib)
 /*
-  (servo-attach)
+  (servo-attach snum pin [pwmin pwmax])
   Attach servo snum to pin. Optionally define new pulse width min/max in microseconds.
 */
 object *fn_ServoAttach (object *args, object *env) {
@@ -1991,6 +2089,7 @@ const char stringTFT1FillTriangle[] PROGMEM = "tft1-fill-triangle";
 const char stringTFT1DrawCurve[] PROGMEM = "tft1-draw-curve";
 const char stringTFT1FillCurve[] PROGMEM = "tft1-fill-curve";
 const char stringTFT1FillScreen[] PROGMEM = "tft1-fill-screen";
+const char stringTFT1LoadImage[] PROGMEM = "tft1-load-image";
 
 const char stringTFT1ReadReg[] PROGMEM = "tft1-read-reg";
 const char stringTFT1WriteReg[] PROGMEM = "tft1-write-reg";
@@ -1998,6 +2097,7 @@ const char stringTFT1ReadData[] PROGMEM = "tft1-read-data";
 const char stringTFT1WriteData[] PROGMEM = "tft1-write-data";
 const char stringTFT1ReadStatus[] PROGMEM = "tft1-read-status";
 const char stringTFT1WriteCommand[] PROGMEM = "tft1-write-command";
+const char stringTFT1SetBacklight[] PROGMEM = "tft1-set-backlight";
 
 const char stringTouchBegin[] PROGMEM = "touch-begin";
 const char stringTouchGetPoint[] PROGMEM = "touch-get-point";
@@ -2158,6 +2258,8 @@ const char docTFT1FillCurve[] PROGMEM = "(tft1-fill-curve x y long short curve [
 "Fill curve at position x y with long arm, short arm and curve part.";
 const char docTFT1FillScreen[] PROGMEM = "(tft1-fill-screen ...)\n"
 "Wrapper copied from uLisp GFX. See doc there.";
+const char docTFT1LoadImage[] PROGMEM = "(tft1-display-image fname x y)\n"
+"Opens file fname from SD if it exits and displays it on screen at position x y.";
 
 const char docTFT1WriteReg[] PROGMEM = "(tft1-write-reg reg val)\n"
 "Low-level access: Write val to register reg.";
@@ -2171,6 +2273,8 @@ const char docTFT1WriteCommand[] PROGMEM = "(tft1-write-command c)\n"
 "Low-level access: Write command c.";
 const char docTFT1ReadStatus[] PROGMEM = "(tft1-read-status)\n"
 "Low-level access: Read status.";
+const char docTFT1SetBacklight[] PROGMEM = "(tft1-set-backlight level)\n"
+"Set backlight to level [0-255].";
 
 const char docTouchBegin[] PROGMEM = "(touch-begin)\n"
 "Initialize touch screen controller.";
@@ -2313,6 +2417,7 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringTFT1DrawCurve, fn_TFT1DrawCurve, 0256, docTFT1DrawCurve },
   { stringTFT1FillCurve, fn_TFT1FillCurve, 0256, docTFT1FillCurve },
   { stringTFT1FillScreen, fn_TFT1FillScreen, 0201, docTFT1FillScreen },
+  { stringTFT1LoadImage, fn_TFT1LoadImage, 0234, docTFT1LoadImage },
 
   { stringTFT1WriteReg, fn_TFT1WriteReg, 0222, docTFT1WriteReg },
   { stringTFT1ReadReg, fn_TFT1ReadReg, 0211, docTFT1ReadReg },
@@ -2320,6 +2425,7 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringTFT1ReadData, fn_TFT1ReadData, 0200, docTFT1ReadData },
   { stringTFT1WriteCommand, fn_TFT1WriteCommand, 0211, docTFT1WriteCommand },
   { stringTFT1ReadStatus, fn_TFT1ReadStatus, 0200, docTFT1ReadStatus },
+  { stringTFT1SetBacklight, fn_TFT1SetBacklight, 0211, docTFT1SetBacklight },
 
   { stringTouchBegin, fn_TouchBegin, 0200, docTouchBegin },
   { stringTouchGetPoint, fn_TouchGetPoint, 0200, docTouchGetPoint },
