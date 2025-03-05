@@ -87,6 +87,22 @@
 #endif
 
 
+/*
+  (set-backlight level)
+  Set backlight level of standard GFX display.
+*/
+#if defined(gfxsupport)
+object *fn_SetBacklight (object *args, object *env) {
+  (void) env;
+  uint8_t level = checkinteger(first(args));
+
+  Serial.println(level);
+
+  analogWrite(PIN_TFT_BACKLIGHT, level);
+  return nil;
+}
+#endif
+
 //USB host keyboard supported anytime
 /*
   Helper function:
@@ -2036,6 +2052,11 @@ object *fn_MatrixSetRotation (object *args, object *env) {
 
 // Symbol names
 
+#if defined (gfxsupport)
+//Added to standard GFX support
+const char stringSetBacklight[] PROGMEM = "set-backlight";
+#endif
+
 //USB host keyboard supported anytime
 const char stringKeyboardGetKey[] PROGMEM = "keyboard-get-key";
 const char stringKeyboardFlush[] PROGMEM = "keyboard-flush";
@@ -2152,6 +2173,12 @@ const char stringMatrixSetRotation[] PROGMEM = "matrix-set-rotation";
 
 
 // Documentation strings
+#if defined(gfxsupport)
+//added to standard GFX support
+const char docSetBacklight[] PROGMEM = "(set-backlight level)\n"
+"Set backlight level of standard GFX display.";
+#endif
+
 //USB host keyboard supported anytime
 const char docKeyboardGetKey[] PROGMEM = "(keyboard-get-key [pressed])\n"
 "Get key last recognized - default: when released, if [pressed] is t: when pressed).";
@@ -2366,6 +2393,10 @@ const char docMatrixSetRotation[] PROGMEM = "(matrix-set-rotation r)\n"
 
 // Symbol lookup table
 const tbl_entry_t lookup_table2[] PROGMEM = {
+
+#if defined(gfxsupport)
+{ stringSetBacklight, fn_SetBacklight, 0211, docSetBacklight },
+#endif
 
 { stringKeyboardGetKey, fn_KeyboardGetKey, 0201, docKeyboardGetKey },
 { stringKeyboardFlush, fn_KeyboardFlush, 0200, docKeyboardFlush },

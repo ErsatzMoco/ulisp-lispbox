@@ -5,8 +5,7 @@ Modified version of ulisp-arm (see below) for use with a self-contained uLisp co
 
 Contains several modifications to the ulisp-arm version (many based on the uLisp firmware for the LilyGO T-Deck)
 as well as a set of suitable uLisp extensions including RFM69 support and a Lisp library providing an extended ULOS system, the most important parts of a uLisp port of ErsatzMoco (github.com/ersatzmoco/ersatzmoco) and a full-screen uLisp and text editor.
-The editor features full SD card support, direct binding to uLisp symbols, full bracket matching and some keyboard shortcuts
-partially compatible with EMACS:
+The editor features full SD card support, direct binding to uLisp symbols, full bracket matching and some keyboard shortcuts partially compatible with EMACS:
 
 * CTRL-q / CTRL-c --- quit editor and return to REPL
 * CTRL-x / CTRL-b / CTRL-n --- discard current text buffer (i.e. new file)
@@ -25,7 +24,10 @@ partially compatible with EMACS:
 * F1 --- toggle bracket matching on/off
 * F2 --- check whether bracket under the cursor has a matching bracket in the buffer. If so, both are temporarily highlighted. (Use when continuous bracket matching is off.)
 * F3 --- invoke "Lispy Little Helper" if applicable, see below
+* F4 --- load the code of a symbol of your choice *read-only* into the editor. You may scroll through it and copy lines, but editing is blocked. To return to your text buffer press F4 again.
 * F5 --- bind contents of the text buffer to a symbol of your choice and quit editor
+
+* F7 --- load text from SD card *read-only* into the editor. You may scroll through it and copy lines, but editing is blocked. To return to your text buffer press F7 again.
 * F8 --- save current buffer to backup file "BACKUP.CL" (overwriting old backup file). This is intended as a quick save function to prevent the worst case scenario of running out of battery before having saved your current work. It is recommended to use F8 at regular intervals.
 * F9 --- delete a file on the SD card
 * F10 --- save text buffer to SD card
@@ -52,6 +54,8 @@ The Lispy Little Helper collects built-in help information of uLisp symbols as a
 *If you do not intend to use this addendum, please set variable "se:help-active" to nil. This is done either by modifying the first active line of the Lisp Library (file LispboxLibrary.h) before uploading the firmware to your Teensy or by executing (setf se:help-active nil) in the REPL after startup.*
 
 **When `se:help-active` is set to `t`, the rotary encoder also controls vertical movement of the cursor in the fullscreen editor, as an alternative to the up/down cursor keys.**
+
+**The backlight of the secondary display is set to `0` by default to reduce the power draw and save some energy. If you want to use the TFT for own experiments, use `(set-backlight level)` to make it visible. `level` may be any integer number between 0 and 255.**
 
 If you want to add the Lispy Little Helper to your Lisp Box, connect the rotary encoder and the display to the following pins (you may change them within the function `se:help`):
 
