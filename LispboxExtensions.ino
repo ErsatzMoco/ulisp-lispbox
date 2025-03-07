@@ -95,9 +95,6 @@
 object *fn_SetBacklight (object *args, object *env) {
   (void) env;
   uint8_t level = checkinteger(first(args));
-
-  Serial.println(level);
-
   analogWrite(PIN_TFT_BACKLIGHT, level);
   return nil;
 }
@@ -457,11 +454,11 @@ object *fn_SDCardDir (object *args, object *env) {
     return nil;
   }
   else if (mode == 1) {
-    dirstr = printDirectoryStr(root, numTabs, dirstr);
+    dirstr = printDirectoryStr(root, dirstr);
     return lispstring(dirstr.c_str());
   }
   else if (mode == 2) {
-    dirlist = printDirectoryList(root, dirlist);
+    dirlist = printDirectoryList(root);
     return dirlist;
   }
   else return nil;
@@ -495,7 +492,7 @@ String printDirectory(File dir, int numTabs) {
   return NULL;
 }
 
-String printDirectoryStr(File dir, int numTabs, String dirstr) {
+String printDirectoryStr(File dir, String dirstr) {
   while (true) {
     File entry =  dir.openNextFile();
     if (! entry) {
@@ -505,7 +502,7 @@ String printDirectoryStr(File dir, int numTabs, String dirstr) {
     dirstr = dirstr + entry.name();
     if (entry.isDirectory()) {
       dirstr = dirstr + "/~%";
-      dirstr = printDirectoryStr(entry, numTabs + 1, dirstr);
+      dirstr = printDirectoryStr(entry, dirstr);
     } else {
       // files have sizes, directories do not
       dirstr = dirstr + " " + String(entry.size()) + "~%";
@@ -515,8 +512,9 @@ String printDirectoryStr(File dir, int numTabs, String dirstr) {
   return dirstr;
 }
 
-object* printDirectoryList(File dir, object* dirlist) {
+object* printDirectoryList(File dir) {
   String dirstr = "";
+  object* dirlist = NULL;
 
   while (true) {
     File entry =  dir.openNextFile();
@@ -527,9 +525,12 @@ object* printDirectoryList(File dir, object* dirlist) {
     dirstr = entry.name();
     if (entry.isDirectory()) {
       dirstr = dirstr + "/";
-      dirlist = cons(printDirectoryList(entry, dirlist), dirlist);
+      dirlist = cons(printDirectoryList(entry), dirlist);
+      dirlist = cons(lispstring(dirstr.c_str()), dirlist);
+    } else {
+      dirlist = cons(lispstring(dirstr.c_str()), dirlist);
     }
-    dirlist = cons(lispstring(dirstr.c_str()), dirlist);
+    
     entry.close();
   }
   return dirlist;

@@ -24,15 +24,15 @@ The editor features full SD card support, direct binding to uLisp symbols, full 
 * F1 --- toggle bracket matching on/off
 * F2 --- check whether bracket under the cursor has a matching bracket in the buffer. If so, both are temporarily highlighted. (Use when continuous bracket matching is off.)
 * F3 --- invoke "Lispy Little Helper" if applicable, see below
-* F4 --- load the code of a symbol of your choice *read-only* into the editor. You may scroll through it and copy lines, but editing is blocked. To return to your text buffer press F4 again.
+* F4 --- load the code of a symbol of your choice *read-only* into the editor. You may scroll through it and copy lines, but editing is blocked. To return to your text buffer press F4 again (or F7 or F12).
 * F5 --- bind contents of the text buffer to a symbol of your choice and quit editor
 
-* F7 --- load text from SD card *read-only* into the editor. You may scroll through it and copy lines, but editing is blocked. To return to your text buffer press F7 again.
+* F7 --- load text from SD card *read-only* into the editor. You may scroll through it and copy lines, but editing is blocked. To return to your text buffer press F7 again (or F4 or F12).
 * F8 --- save current buffer to backup file "BACKUP.CL" (overwriting old backup file). This is intended as a quick save function to prevent the worst case scenario of running out of battery before having saved your current work. It is recommended to use F8 at regular intervals.
 * F9 --- delete a file on the SD card
 * F10 --- save text buffer to SD card
 * F11 --- load text from SD card into buffer, discarding the present one
-* F12 --- show directory of SD card
+* F12 --- show directory of SD card in *read-only* buffer. To return to your text buffer press F12 again (or F4 or F7).
 Note: file names for SD card follow the 8.3 standard and thus must be given in capital letters. 
 
 * ALT-0 to ALT-9 --- insert one of up to ten predefined snippets at cursor position

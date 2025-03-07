@@ -1,5 +1,5 @@
 /*
-  LispBox LispLibrary - Version 1.1 - Jan 2025
+  LispBox LispLibrary - Version 1.2 - Mar 2025
   Hartmut Grawe - github.com/ersatzmoco - Jan 2025
 
   Some parts based on:
@@ -79,6 +79,8 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 #| BACKLIGHT OF SECONDARY DISPLAY DISABLED BY DEFAULT TO SAVE ENERGY |#
 
 (set-backlight 0)
+
+(backtrace t)
 
 ;
 ; Extended ULOS functions
@@ -199,6 +201,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	(defvar se:lastmatch ())
 	(defvar se:match nil)
 	(defvar se:exit nil)
+	(defvar se:numtabs 2)
 	
 	(when se:help-active
 		(defvar se:CLK 16)
@@ -497,46 +500,39 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 )
 
 (defun se:show-dir ()
-	(when se:editable
-		(keyboard-flush)
-		(se:hide-cursor)
-		(tft1-fill-rect 34 18 763 432 se:bg_col)
-		(tft1-fill-rect 0 18 33 432 se:bg_col)
-		(tft1-set-text-color se:line_col)
-		(let ((spos (se:calc-scrpos (cons 0 0))))
-			(tft1-set-cursor (car spos) (cdr spos))
-			(tft1-write-text "/")
+	(keyboard-flush)
+	(se:hide-cursor)
+	(if se:editable
+		(progn
+			(setf se:editable nil)
+			(se:save-buffer)
+			(let ((dirbuf (sd-card-dir 2)))
+				(se:compile-dir dirbuf 0)
+				(setq se:buffer (reverse se:buffer))
+			)
+			(se:map-brackets)
+			(se:move-window t)
+
+			(tft1-set-cursor (* 36 se:cwidth) 0)
+			(tft1-set-text-color se:alert_col se:line_col)
+			(tft1-write-text "SD DIRECTORY")
+
 		)
-		(let ((dirbuf (sd-card-dir 2)))
-			(se:compile-dir dirbuf (cons 3 1))
-		)
-		(loop
-			(when (keyboard-get-key t) (return))
-		)
-		(keyboard-flush)
-		(se:show-text)
-		(se:show-cursor)
+		(se:restore-buffer)
 	)
+	(se:show-cursor)
+	(keyboard-flush)
 )
 
-(defun se:compile-dir (mydir dpos)
-	(let ((spos nil))
-		(loop
-			(when (null mydir) (return))
-			(let ((entry (pop mydir)))
-				(if (listp entry)
-					(se:compile-dir entry (cons (+ 3 (car dpos)) (cdr dpos)))
-					(unless (or (> (car dpos) (- (car se:txtmax) (length entry))) (> (cdr dpos) (cdr se:txtmax)))
-						(setf spos (se:calc-scrpos dpos))
-						(if (search "/" entry)
-							(tft1-set-text-color se:line_col)
-							(tft1-set-text-color se:code_col)
-						)
-						(tft1-set-cursor (car spos) (cdr spos))
-						(tft1-write-text entry)
-						(incf (cdr dpos))
-					)
-				)
+(defun se:compile-dir (mydir tab)
+	(let ((tabstr ""))
+		(dotimes (i tab)
+			(setf tabstr (concatenate 'string tabstr " "))
+		)
+		(dolist (entry mydir)
+			(if (listp entry)
+				(se:compile-dir entry (+ tab 3))
+				(push (concatenate 'string tabstr entry) se:buffer)
 			)
 		)
 	)
@@ -607,12 +603,11 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	)
 )
 
-(defun se:tab ()
+(defun se:tab (numtabs)
 	(keyboard-flush)
-		(se:insert #\032)
-		(se:insert #\032)
-		(se:insert #\032)
-		(se:insert #\032)
+		(dotimes (i numtabs)
+			(se:insert #\032)
+		)
 	(keyboard-flush)
 )
 
@@ -1225,7 +1220,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 							(218 (se:up))
 							(217 (se:down))
 							(10 (se:enter))
-							(9 (se:tab) (setf lastkey nil))
+							(9 (se:tab se:numtabs) (setf lastkey nil))
 							(127 (se:delete))
 							(251 (se:copy) (setf lastkey nil))
 							(252 (se:paste) (setf lastkey nil))
@@ -2880,5 +2875,7 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 		t 
 	)
 )
+
+(backtrace)
 
 )lisplibrary";
