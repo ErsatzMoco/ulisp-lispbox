@@ -102,6 +102,10 @@
 
     USBHIDParser hid1(myusb);
     USBHIDParser hid2(myusb);
+
+    MouseController mouse(myusb);
+    USBHIDParser hid3(myusb);
+    USBHIDParser hid4(myusb);
   #endif
 
 #else
@@ -261,6 +265,9 @@ volatile uint16_t kb_pressed_k = 0;
 volatile uint8_t kb_pressed_m = 0;
 volatile uint16_t kb_released_k = 0;
 volatile uint8_t kb_released_m = 0;
+
+// For Teensy HID mouse polling
+volatile uint8_t ms_buttons = 0;
 
 // Flags
 enum flag { PRINTREADABLY, RETURNFLAG, ESCAPE, EXITEDITOR, LIBRARYLOADED, NOESC, NOECHO, MUFFLEERRORS, BACKTRACE };

@@ -88,6 +88,17 @@
 
 
 /*
+  Helper function: Read BGR-Pixel from BMP and convert it to RGB 565 (16 bit) color value
+*/
+uint16_t readBGR(File file) {
+  int b = file.read();
+  int g = file.read();
+  int r = file.read();
+
+  return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+} 
+
+/*
   (set-backlight level)
   Set backlight level of standard GFX display.
 */
@@ -98,9 +109,81 @@ object *fn_SetBacklight (object *args, object *env) {
   analogWrite(PIN_TFT_BACKLIGHT, level);
   return nil;
 }
+
+/*
+  (load-image fname x y)
+  Opens file fname from SD if it exits and displays it on screen at position x y.
+*/
+object *fn_LoadImage (object *args, object *env) {
+  (void) args, (void) env;
+
+  SD.begin(SDCARD_SS_PIN);
+
+  int slength = stringlength(checkstring(first(args)))+1;
+  char *fnbuf = (char*)malloc(slength);
+  cstring(first(args), fnbuf, slength);
+  File file;
+
+  if (!SD.exists(fnbuf)) {
+    pfstring("File not found", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+  int x = checkinteger(second(args));
+  int y = checkinteger(third(args));
+  (void) args;
+
+  char buffer[BUFFERSIZE];
+  file = SD.open(fnbuf);
+  if (!file) { 
+    pfstring("Problem reading from SD card", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  char b = file.read();
+  char m = file.read();
+  if ((m != 77) || (b != 66)) {
+    pfstring("No BMP file", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  file.seek(10);
+  uint32_t offset = SDRead32(file);
+  SDRead32(file);
+  int32_t width = SDRead32(file);
+  int32_t height = SDRead32(file);
+  int zpad = 0;
+  if ((width % 4) > 0) {
+    zpad = (4 - ((width * 3) % 4));
+  }
+
+  file.seek(offset);
+
+  tft.startWrite();
+  for (int ly = (y + height - 1); ly >= y; ly--) {
+    for (int lx = x; lx < (x + width); lx++) {
+      tft.writePixel(lx, ly, readBGR(file));
+    }
+    //ignore trailing zero bytes
+    if (zpad > 0) {
+      for (int i = 0; i < zpad; i++) {
+        file.read();
+      }
+    }
+  }
+  tft.endWrite();
+
+  file.close();
+  free(fnbuf);
+  return nil;
+}
+
+
 #endif
 
-//USB host keyboard supported anytime
+//USB host keyboard and mouse supported anytime
 /*
   Helper function:
   Translate keys if necessary - separate from REPL key translation
@@ -351,6 +434,42 @@ object *fn_KeyboardFlush (object *args, object *env) {
   kb_released_m = 0;
 
   return nil;
+}
+
+/*
+  (mouse-get-values)
+  Query HID mouse interface and return values relx, rely, buttons, relwheel, relwheelH as a list.
+*/
+object *fn_MouseGetValues (object *args, object *env) {
+  (void) args, (void) env;
+
+  if (mouse.available()) {
+    ms_buttons = mouse.getButtons();
+    object *mb = number(ms_buttons);
+    object *mx = number(mouse.getMouseX());
+    object *my = number(mouse.getMouseY());
+    object *mw = number(mouse.getWheel());
+    object *mwh = number(mouse.getWheelH());
+
+    mouse.mouseDataClear();
+
+    return cons(mx, cons(my, cons(mb, cons(mw, cons(mwh, NULL)))));
+  }
+  else {
+    return nil;
+  }
+}
+
+/*
+  (mouse-last-buttons)
+  Returns last mouse button status without retrieving current values.
+*/
+object *fn_MouseLastButtons (object *args, object *env) {
+  (void) args, (void) env;
+
+  object *mb = number(ms_buttons);
+
+  return mb;
 }
 
 /*
@@ -1054,18 +1173,6 @@ object *fn_TFT1FillScreen (object *args, object *env) {
 }
 
 /*
-  Helper function: Read BGR-Pixel from BMP and convert it to RGB 565 (16 bit) color value
-*/
-uint16_t readBGR(File file) {
-  int b = file.read();
-  int g = file.read();
-  int r = file.read();
-
-  return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
-} 
-
-
-/*
   (tft1-load-image fname x y)
   Opens file fname from SD if it exits and displays it on screen at position x y.
 */
@@ -1139,7 +1246,7 @@ object *fn_TFT1LoadImage (object *args, object *env) {
 
 
 /*
-  (tft1-write-reg reg)
+  (tft1-write-reg reg val)
   Low-level access: Write val to register reg.
 */
 object *fn_TFT1WriteReg (object *args, object *env) {
@@ -1154,13 +1261,12 @@ object *fn_TFT1WriteReg (object *args, object *env) {
 */
 object *fn_TFT1ReadReg (object *args, object *env) {
   (void) env;
-  tft1.readReg(checkinteger(first(args)));
-  return nil;
+  return number(tft1.readReg(checkinteger(first(args))));
 }
 
 /*
   (tft1-write-data d)
-  Low-level access: Write data d.
+  Low-level access: Write data d to current register.
 */
 object *fn_TFT1WriteData (object *args, object *env) {
   (void) env;
@@ -1170,17 +1276,16 @@ object *fn_TFT1WriteData (object *args, object *env) {
 
 /*
   (tft1-read-data)
-  Low-level access: Read data value.
+  Low-level access: Read data value from current register.
 */
 object *fn_TFT1ReadData (object *args, object *env) {
   (void) args, (void) env;
-  tft1.readData();
-  return nil;
+  return number(tft1.readData());
 }
 
 /*
   (tft1-write-command c)
-  Low-level access: Write command c.
+  Low-level access: Write command c to current register.
 */
 object *fn_TFT1WriteCommand (object *args, object *env) {
   (void) env;
@@ -1190,12 +1295,11 @@ object *fn_TFT1WriteCommand (object *args, object *env) {
 
 /*
   (tft1-read-status)
-  Low-level access: Read status.
+  Low-level access: Read status from current register.
 */
 object *fn_TFT1ReadStatus (object *args, object *env) {
   (void) args, (void) env;
-  tft1.readStatus();
-  return nil;
+  return number(tft1.readStatus());
 }
 
 /*
@@ -2056,11 +2160,14 @@ object *fn_MatrixSetRotation (object *args, object *env) {
 #if defined (gfxsupport)
 //Added to standard GFX support
 const char stringSetBacklight[] PROGMEM = "set-backlight";
+const char stringLoadImage[] PROGMEM = "load-image";
 #endif
 
 //USB host keyboard supported anytime
 const char stringKeyboardGetKey[] PROGMEM = "keyboard-get-key";
 const char stringKeyboardFlush[] PROGMEM = "keyboard-flush";
+const char stringMouseGetValues[] PROGMEM = "mouse-get-values";
+const char stringMouseLastButtons[] PROGMEM = "mouse-last-buttons";
 
 //String helper function from M5Cardputer editor version by hasn0life
 const char stringSearchStr[] PROGMEM = "search-str";
@@ -2178,13 +2285,19 @@ const char stringMatrixSetRotation[] PROGMEM = "matrix-set-rotation";
 //added to standard GFX support
 const char docSetBacklight[] PROGMEM = "(set-backlight level)\n"
 "Set backlight level of standard GFX display.";
+const char docLoadImage[] PROGMEM = "(load-image fname x y)\n"
+"Opens file fname from SD if it exits and displays it on screen at position x y.";
 #endif
 
-//USB host keyboard supported anytime
+//USB host keyboard and mouse supported anytime
 const char docKeyboardGetKey[] PROGMEM = "(keyboard-get-key [pressed])\n"
 "Get key last recognized - default: when released, if [pressed] is t: when pressed).";
 const char docKeyboardFlush[] PROGMEM = "(keyboard-flush)\n"
 "Discard missing key up/down events.";
+const char docMouseGetValues[] PROGMEM = "(mouse-get-values)\n"
+"Query HID mouse interface and return values relx, rely, buttons, relwheel, relwheelH as a list.";
+const char docMouseLastButtons[] PROGMEM = "(mouse-last-buttons)\n"
+"Returns last mouse button status without retrieving current values.";
 
 //String helper function from M5Cardputer editor version by hasn0life
 const char docSearchStr[] PROGMEM = "(search-str pattern target [startpos])\n"
@@ -2294,13 +2407,13 @@ const char docTFT1WriteReg[] PROGMEM = "(tft1-write-reg reg val)\n"
 const char docTFT1ReadReg[] PROGMEM = "(tft1-read-reg reg)\n"
 "Low-level access: Read register reg.";
 const char docTFT1WriteData[] PROGMEM = "(tft1-write-data d)\n"
-"Low-level access: Write data d.";
+"Low-level access: Write data d to current register.";
 const char docTFT1ReadData[] PROGMEM = "(tft1-read-data)\n"
-"Low-level access: Read data value.";
+"Low-level access: Read data value from current register.";
 const char docTFT1WriteCommand[] PROGMEM = "(tft1-write-command c)\n"
-"Low-level access: Write command c.";
+"Low-level access: Write command c to current register.";
 const char docTFT1ReadStatus[] PROGMEM = "(tft1-read-status)\n"
-"Low-level access: Read status.";
+"Low-level access: Read status from current register.";
 const char docTFT1SetBacklight[] PROGMEM = "(tft1-set-backlight level)\n"
 "Set backlight to level [0-255].";
 
@@ -2397,10 +2510,13 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
 
 #if defined(gfxsupport)
 { stringSetBacklight, fn_SetBacklight, 0211, docSetBacklight },
+{ stringLoadImage, fn_LoadImage, 0233, docLoadImage },
 #endif
 
 { stringKeyboardGetKey, fn_KeyboardGetKey, 0201, docKeyboardGetKey },
 { stringKeyboardFlush, fn_KeyboardFlush, 0200, docKeyboardFlush },
+{ stringMouseGetValues, fn_MouseGetValues, 0200, docMouseGetValues },
+{ stringMouseLastButtons, fn_MouseLastButtons, 0200, docMouseLastButtons },
 { stringSearchStr, fn_searchstr, 0224, docSearchStr },
 
 #if defined sdcardsupport
@@ -2449,7 +2565,7 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringTFT1DrawCurve, fn_TFT1DrawCurve, 0256, docTFT1DrawCurve },
   { stringTFT1FillCurve, fn_TFT1FillCurve, 0256, docTFT1FillCurve },
   { stringTFT1FillScreen, fn_TFT1FillScreen, 0201, docTFT1FillScreen },
-  { stringTFT1LoadImage, fn_TFT1LoadImage, 0234, docTFT1LoadImage },
+  { stringTFT1LoadImage, fn_TFT1LoadImage, 0233, docTFT1LoadImage },
 
   { stringTFT1WriteReg, fn_TFT1WriteReg, 0222, docTFT1WriteReg },
   { stringTFT1ReadReg, fn_TFT1ReadReg, 0211, docTFT1ReadReg },

@@ -45,9 +45,9 @@
 #include <SPI.h>
 
 /// @cond DISABLE
-#if defined(ARDUINO_ARCH_ARC32)
+#if defined(ARDUINO_TEENSY40) || defined(ARDUINO_TEENSY41)
 /// @endcond
-uint32_t spi1_speed = 12000000; /*!< 12MHz */
+uint32_t spi1_speed = 60000000; /*!< 60MHz */
 /// @cond DISABLE
 #else
 /// @endcond
