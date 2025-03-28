@@ -111,11 +111,11 @@ object *fn_SetBacklight (object *args, object *env) {
 }
 
 /*
-  (load-image fname x y)
-  Opens file fname from SD if it exits and displays it on screen at position x y.
+  (display-bmp fname x y)
+  Open BMP file fname from SD if it exits and display it on screen at position x y.
 */
-object *fn_LoadImage (object *args, object *env) {
-  (void) args, (void) env;
+object *fn_DisplayBMP (object *args, object *env) {
+  (void) env;
 
   SD.begin(SDCARD_SS_PIN);
 
@@ -162,9 +162,12 @@ object *fn_LoadImage (object *args, object *env) {
   file.seek(offset);
 
   tft.startWrite();
+  int starttime;
   for (int ly = (y + height - 1); ly >= y; ly--) {
     for (int lx = x; lx < (x + width); lx++) {
       tft.writePixel(lx, ly, readBGR(file));
+      //starttime = micros();
+      //while (micros() < (starttime + 64));
     }
     //ignore trailing zero bytes
     if (zpad > 0) {
@@ -180,6 +183,180 @@ object *fn_LoadImage (object *args, object *env) {
   return nil;
 }
 
+/*
+  (load-bmp fname arr [offx] [offy])
+  Open BMP file fname from SD if it exits and copy it into the two-dimensional uLisp array provided.
+  Note that this allocates massive amounts of RAM; use for small bitmaps/icons only.
+  When the image is larger than the array, only the upper leftmost area of the bitmap fitting into the array is loaded.
+  Providing offx and offy you may move the "window" of the array to other parts of the bitmap (useful e.g. for tiling).
+*/
+object *fn_LoadBMP (object *args, object *env) {
+
+  SD.begin(SDCARD_SS_PIN);
+
+  int slength = stringlength(checkstring(first(args)))+1;
+  char *fnbuf = (char*)malloc(slength);
+  cstring(first(args), fnbuf, slength);
+  File file;
+
+  if (!SD.exists(fnbuf)) {
+    pfstring("File not found", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+  object* array = second(args);
+  if (!arrayp(array)) {
+    pfstring("Argument is not an array", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+  object *dimensions = cddr(array);
+  if (listp(dimensions)) {
+    if (listlength(dimensions) != 2) {
+      pfstring("Array must be two-dimensional", (pfun_t)pserial);
+      free(fnbuf);
+      return nil;
+    }
+  }
+  else {
+    pfstring("Array must be two-dimensional", (pfun_t)pserial);
+      free(fnbuf);
+      return nil;
+  }
+  args = cddr(args);
+  int offx, offy = 0;
+  if (args != NULL) {
+    offx = checkinteger(car(args));
+    args = cdr(args);
+    if (args != NULL) {
+      offy = checkinteger(car(args));
+    }
+  }
+  
+  (void) args;
+
+  int aw = first(dimensions)->integer;
+  int ah = second(dimensions)->integer;
+  int bit;
+  object* subscripts;
+  object* ox;
+  object* oy;
+  object* oyy;
+  object** element;
+
+  char buffer[BUFFERSIZE];
+  file = SD.open(fnbuf);
+  if (!file) { 
+    pfstring("Problem reading from SD card", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  char b = file.read();
+  char m = file.read();
+  if ((m != 77) || (b != 66)) {
+    pfstring("No BMP file", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  file.seek(10);
+  uint32_t offset = SDRead32(file);
+  SDRead32(file);
+  int32_t width = SDRead32(file);
+  int32_t height = SDRead32(file);
+  int zpad = 0;
+  if ((width % 4) > 0) {
+    zpad = (4 - ((width * 3) % 4));
+  }
+
+  file.seek(offset);
+
+  for (int ly = (height - 1); ly >= 0; ly--) {
+    for (int lx = 0; lx < width; lx++) {
+      if ((lx < (aw+offx)) && (ly < (ah+offy)) && (lx >= offx) && (ly >= offy)) {
+        ox = number(lx-offx);
+        oy = number(ly-offy);
+        oyy = cons(oy, NULL);
+        subscripts = cons(ox, oyy);
+        element = getarray(array, subscripts, env, &bit);
+        *element = number(readBGR(file));
+
+        myfree(subscripts);
+        myfree(oyy);
+        myfree(oy);
+        myfree(ox);
+      }
+      else {
+        file.read();
+        file.read();
+        file.read();
+      }
+    }
+    //ignore trailing zero bytes
+    if (zpad > 0) {
+      for (int i = 0; i < zpad; i++) {
+        file.read();
+      }
+    }
+  }
+
+  file.close();
+  free(fnbuf);
+  return nil;
+}
+
+/*
+  (show-bmp arr x y)
+  Show bitmap image contained in uLisp array arr on screen at position x y.
+*/
+object *fn_ShowBMP (object *args, object *env) {
+
+  object* array = first(args);
+  if (!arrayp(array)) error2("argument is not an array");
+
+  object *dimensions = cddr(array);
+  if (listp(dimensions)) {
+    if (listlength(dimensions) != 2) error2("array must be two-dimensional");
+  }
+  else error2("array must be two-dimensional");
+
+  int x = checkinteger(second(args));
+  int y = checkinteger(third(args));  
+  (void) args;
+
+  int aw = first(dimensions)->integer;
+  int ah = second(dimensions)->integer;
+  int bit;
+  object* subscripts;
+  object* ox;
+  object* oy;
+  object* oyy;
+  object** element;
+
+  tft.startWrite();
+  int starttime;
+  for (int ay = 0; ay < ah; ay++) {
+    for (int ax = 0; ax < aw; ax++) {
+      ox = number(ax);
+      oy = number(ay);
+      oyy = cons(oy, NULL);
+      subscripts = cons(ox, oyy);
+      element = getarray(array, subscripts, env, &bit);
+      tft.writePixel(x+ax, y+ay, checkinteger(*element));
+      //starttime = micros();
+      //while (micros() < (starttime + 64));
+
+      myfree(subscripts);
+      myfree(oyy);
+      myfree(oy);
+      myfree(ox);
+    }
+  }
+  tft.endWrite();
+
+  return nil;
+}
 
 #endif
 
@@ -1173,11 +1350,11 @@ object *fn_TFT1FillScreen (object *args, object *env) {
 }
 
 /*
-  (tft1-load-image fname x y)
+  (tft1-display-bmp fname x y)
   Opens file fname from SD if it exits and displays it on screen at position x y.
 */
-object *fn_TFT1LoadImage (object *args, object *env) {
-  (void) args, (void) env;
+object *fn_TFT1DisplayBMP (object *args, object *env) {
+  (void) env;
 
   SD.begin(SDCARD_SS_PIN);
 
@@ -1241,6 +1418,56 @@ object *fn_TFT1LoadImage (object *args, object *env) {
   
   file.close();
   free(fnbuf);
+  return nil;
+}
+
+/*
+  (tft1-show-bmp arr x y)
+  Show bitmap image contained in uLisp array arr on screen at position x y.
+*/
+object *fn_TFT1ShowBMP (object *args, object *env) {
+
+  object* array = first(args);
+  if (!arrayp(array)) error2("argument is not an array");
+
+  object *dimensions = cddr(array);
+  if (listp(dimensions)) {
+    if (listlength(dimensions) != 2) error2("array must be two-dimensional");
+  }
+  else error2("array must be two-dimensional");
+
+  int x = checkinteger(second(args));
+  int y = checkinteger(third(args));  
+  (void) args;
+
+  int aw = first(dimensions)->integer;
+  int ah = second(dimensions)->integer;
+  int bit;
+  object* subscripts;
+  object* ox;
+  object* oy;
+  object* oyy;
+  object** element;
+
+  uint16_t linearr[aw];
+  tft1.graphicsMode();
+
+  for (int ay = 0; ay < ah; ay++) {
+    for (int ax = 0; ax < aw; ax++) {
+      ox = number(ax);
+      oy = number(ay);
+      oyy = cons(oy, NULL);
+      subscripts = cons(ox, oyy);
+      element = getarray(array, subscripts, env, &bit);
+      linearr[ax] = checkinteger(*element);
+      myfree(subscripts);
+      myfree(oyy);
+      myfree(oy);
+      myfree(ox);
+    }
+    tft1.drawPixels(linearr, aw, x, y+ay);
+  }
+
   return nil;
 }
 
@@ -2160,7 +2387,9 @@ object *fn_MatrixSetRotation (object *args, object *env) {
 #if defined (gfxsupport)
 //Added to standard GFX support
 const char stringSetBacklight[] PROGMEM = "set-backlight";
-const char stringLoadImage[] PROGMEM = "load-image";
+const char stringDisplayBMP[] PROGMEM = "display-bmp";
+const char stringLoadBMP[] PROGMEM = "load-bmp";
+const char stringShowBMP[] PROGMEM = "show-bmp";
 #endif
 
 //USB host keyboard supported anytime
@@ -2218,7 +2447,8 @@ const char stringTFT1FillTriangle[] PROGMEM = "tft1-fill-triangle";
 const char stringTFT1DrawCurve[] PROGMEM = "tft1-draw-curve";
 const char stringTFT1FillCurve[] PROGMEM = "tft1-fill-curve";
 const char stringTFT1FillScreen[] PROGMEM = "tft1-fill-screen";
-const char stringTFT1LoadImage[] PROGMEM = "tft1-load-image";
+const char stringTFT1DisplayBMP[] PROGMEM = "tft1-display-bmp";
+const char stringTFT1ShowBMP[] PROGMEM = "tft1-show-bmp";
 
 const char stringTFT1ReadReg[] PROGMEM = "tft1-read-reg";
 const char stringTFT1WriteReg[] PROGMEM = "tft1-write-reg";
@@ -2285,8 +2515,15 @@ const char stringMatrixSetRotation[] PROGMEM = "matrix-set-rotation";
 //added to standard GFX support
 const char docSetBacklight[] PROGMEM = "(set-backlight level)\n"
 "Set backlight level of standard GFX display.";
-const char docLoadImage[] PROGMEM = "(load-image fname x y)\n"
-"Opens file fname from SD if it exits and displays it on screen at position x y.";
+const char docDisplayBMP[] PROGMEM = "(display-bmp fname x y)\n"
+"Open BMP file fname from SD if it exits and display it on screen at position x y.";
+const char docLoadBMP[] PROGMEM = "(load-bmp fname arr [offx] [offy])\n"
+"Open BMP file fname from SD if it exits and copy it into the two-dimensional uLisp array provided.\n"
+"Note that this allocates massive amounts of RAM. Use for small bitmaps/icons only.\n"
+"When the image is larger than the array, only the upper leftmost area of the bitmap fitting into the array is loaded.\n"
+"Providing offx and offy you may move the 'window' of the array to other parts of the bitmap (useful e.g. for tiling).";
+const char docShowBMP[] PROGMEM = "(show-bmp arr x y)\n"
+"Show bitmap image contained in uLisp array arr on screen at position x y.";
 #endif
 
 //USB host keyboard and mouse supported anytime
@@ -2399,8 +2636,10 @@ const char docTFT1FillCurve[] PROGMEM = "(tft1-fill-curve x y long short curve [
 "Fill curve at position x y with long arm, short arm and curve part.";
 const char docTFT1FillScreen[] PROGMEM = "(tft1-fill-screen ...)\n"
 "Wrapper copied from uLisp GFX. See doc there.";
-const char docTFT1LoadImage[] PROGMEM = "(tft1-display-image fname x y)\n"
+const char docTFT1DisplayBMP[] PROGMEM = "(tft1-display-bmp fname x y)\n"
 "Opens file fname from SD if it exits and displays it on screen at position x y.";
+const char docTFT1ShowBMP[] PROGMEM = "(tft1-show-bmp arr x y)\n"
+"Show bitmap image contained in uLisp array arr on screen at position x y.";
 
 const char docTFT1WriteReg[] PROGMEM = "(tft1-write-reg reg val)\n"
 "Low-level access: Write val to register reg.";
@@ -2510,7 +2749,9 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
 
 #if defined(gfxsupport)
 { stringSetBacklight, fn_SetBacklight, 0211, docSetBacklight },
-{ stringLoadImage, fn_LoadImage, 0233, docLoadImage },
+{ stringDisplayBMP, fn_DisplayBMP, 0233, docDisplayBMP },
+{ stringLoadBMP, fn_LoadBMP, 0224, docLoadBMP },
+{ stringShowBMP, fn_ShowBMP, 0233, docShowBMP },
 #endif
 
 { stringKeyboardGetKey, fn_KeyboardGetKey, 0201, docKeyboardGetKey },
@@ -2565,7 +2806,8 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringTFT1DrawCurve, fn_TFT1DrawCurve, 0256, docTFT1DrawCurve },
   { stringTFT1FillCurve, fn_TFT1FillCurve, 0256, docTFT1FillCurve },
   { stringTFT1FillScreen, fn_TFT1FillScreen, 0201, docTFT1FillScreen },
-  { stringTFT1LoadImage, fn_TFT1LoadImage, 0233, docTFT1LoadImage },
+  { stringTFT1DisplayBMP, fn_TFT1DisplayBMP, 0233, docTFT1DisplayBMP },
+  { stringTFT1ShowBMP, fn_TFT1ShowBMP, 0233, docTFT1ShowBMP },
 
   { stringTFT1WriteReg, fn_TFT1WriteReg, 0222, docTFT1WriteReg },
   { stringTFT1ReadReg, fn_TFT1ReadReg, 0211, docTFT1ReadReg },
