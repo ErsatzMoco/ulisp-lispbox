@@ -185,7 +185,7 @@ object *fn_DisplayBMP (object *args, object *env) {
 
 /*
   (load-bmp fname arr [offx] [offy])
-  Open BMP file fname from SD if it exits and copy it into the two-dimensional uLisp array provided.
+  Open RGB BMP file fname from SD if it exits and copy it into the two-dimensional uLisp array provided.
   Note that this allocates massive amounts of RAM; use for small bitmaps/icons only.
   When the image is larger than the array, only the upper leftmost area of the bitmap fitting into the array is loaded.
   Providing offx and offy you may move the "window" of the array to other parts of the bitmap (useful e.g. for tiling).
@@ -195,7 +195,7 @@ object *fn_LoadBMP (object *args, object *env) {
   SD.begin(SDCARD_SS_PIN);
 
   int slength = stringlength(checkstring(first(args)))+1;
-  char *fnbuf = (char*)malloc(slength);
+  char* fnbuf = (char*)malloc(slength);
   cstring(first(args), fnbuf, slength);
   File file;
 
@@ -210,7 +210,7 @@ object *fn_LoadBMP (object *args, object *env) {
     free(fnbuf);
     return nil;
   }
-  object *dimensions = cddr(array);
+  object* dimensions = cddr(array);
   if (listp(dimensions)) {
     if (listlength(dimensions) != 2) {
       pfstring("Array must be two-dimensional", (pfun_t)pserial);
@@ -224,7 +224,9 @@ object *fn_LoadBMP (object *args, object *env) {
       return nil;
   }
   args = cddr(args);
-  int offx, offy = 0;
+  int offx = 0;
+  int offy = 0;
+
   if (args != NULL) {
     offx = checkinteger(car(args));
     args = cdr(args);
@@ -307,8 +309,155 @@ object *fn_LoadBMP (object *args, object *env) {
 }
 
 /*
-  (show-bmp arr x y)
+  (load-mono fname arr [offx] [offy])
+  Open monochrome BMP file fname from SD if it exits and copy it into the two-dimensional uLisp bit array provided.
+  When the image is larger than the array, only the upper leftmost area of the bitmap fitting into the array is loaded.
+  Providing offx and offy you may move the "window" of the array to other parts of the bitmap (useful e.g. for tiling).
+*/
+object *fn_LoadMono (object *args, object *env) {
+
+  SD.begin(SDCARD_SS_PIN);
+
+  int slength = stringlength(checkstring(first(args)))+1;
+  char* fnbuf = (char*)malloc(slength);
+  cstring(first(args), fnbuf, slength);
+  File file;
+
+  if (!SD.exists(fnbuf)) {
+    pfstring("File not found", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+  object* array = second(args);
+  if (!arrayp(array)) {
+    pfstring("Argument is not an array", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+  object* dimensions = cddr(array);
+  if (listp(dimensions)) {
+    if (listlength(dimensions) != 2) {
+      pfstring("Array must be two-dimensional", (pfun_t)pserial);
+      free(fnbuf);
+      return nil;
+    }
+  }
+  else {
+    pfstring("Array must be two-dimensional", (pfun_t)pserial);
+      free(fnbuf);
+      return nil;
+  }
+  args = cddr(args);
+  int offx = 0;
+  int offy = 0;
+
+  if (args != NULL) {
+    offx = checkinteger(car(args));
+    args = cdr(args);
+    if (args != NULL) {
+      offy = checkinteger(car(args));
+    }
+  }
+  (void) args;
+
+  int aw = abs(first(dimensions)->integer);
+  int ah = abs(second(dimensions)->integer);
+  int bit;
+  object* subscripts;
+  object* ox;
+  object* oy;
+  object* oyy;
+  object** element;
+
+  char buffer[BUFFERSIZE];
+  file = SD.open(fnbuf);
+  if (!file) { 
+    pfstring("Problem reading from SD card", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  char b = file.read();
+  char m = file.read();
+  if ((m != 77) || (b != 66)) {
+    pfstring("No BMP file", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  file.seek(10);
+  uint32_t offset = SDRead32(file);
+  SDRead32(file);
+  int32_t width = SDRead32(file);
+  int32_t height = SDRead32(file);
+  int linebytes = floor(width / 8);
+  int restbits = width % 8;
+  if (restbits > 0) linebytes++;
+  int zpad = 0;
+  if ((linebytes % 4) > 0) {
+    zpad = (4 - (linebytes % 4));
+  }
+
+  file.seek(28);
+  uint16_t depth = file.read();
+  if (depth > 1) { 
+    pfstring("No monochrome bitmap file", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  file.seek(offset);
+
+  int lx = 0;
+  int bmpbyte = 0;
+  int bmpbit = 0;
+
+  for (int ly = (height - 1); ly >= 0; ly--) {
+    for (int bx = 0; bx < linebytes; bx++) {
+      bmpbyte = file.read();
+      for (int bix = 0; bix < 8; bix++) {
+        lx = (bx * 8) + bix;
+        if ((lx < (aw+offx)) && (ly < (ah+offy)) && (lx >= offx) && (ly >= offy)) {
+          ox = number(lx-offx);
+          oy = number(ly-offy);
+          oyy = cons(oy, NULL);
+          subscripts = cons(ox, oyy);
+          element = getarray(array, subscripts, env, &bit);
+
+          bmpbit = bmpbyte & (1 << (7-bix));
+          if (bmpbit > 0) {
+            bmpbit = 1;
+          }
+          else {
+            bmpbit = 0;
+          }
+          *element = number((checkinteger(*element) & ~(1<<bit)) | bmpbit<<bit);
+
+          myfree(subscripts);
+          myfree(oyy);
+          myfree(oy);
+          myfree(ox);
+        }
+      }
+    }
+    //ignore trailing zero bytes
+    if (zpad > 0) {
+      for (int i = 0; i < zpad; i++) {
+        file.read();
+      }
+    }
+  }
+
+  file.close();
+  free(fnbuf);
+  return nil;
+}
+
+/*
+  (show-bmp arr x y [monocol])
   Show bitmap image contained in uLisp array arr on screen at position x y.
+  The function automatically distinguishes between monochrome and color image arrays.
+  If monocol is provided, a monochrome image is painted with that color value.
 */
 object *fn_ShowBMP (object *args, object *env) {
 
@@ -322,11 +471,18 @@ object *fn_ShowBMP (object *args, object *env) {
   else error2("array must be two-dimensional");
 
   int x = checkinteger(second(args));
-  int y = checkinteger(third(args));  
+  int y = checkinteger(third(args));
+
+  int monocol = 0xFFFF;
+  args = cddr(args);
+  args = cdr(args);
+  if (args != NULL) {
+    monocol = checkinteger(first(args));
+  }
   (void) args;
 
-  int aw = first(dimensions)->integer;
-  int ah = second(dimensions)->integer;
+  int aw = abs(first(dimensions)->integer);
+  int ah = abs(second(dimensions)->integer);
   int bit;
   object* subscripts;
   object* ox;
@@ -336,6 +492,8 @@ object *fn_ShowBMP (object *args, object *env) {
 
   tft.startWrite();
   int starttime;
+  int bmpbit = 0;
+  uint16_t color = 0;
   for (int ay = 0; ay < ah; ay++) {
     for (int ax = 0; ax < aw; ax++) {
       ox = number(ax);
@@ -343,7 +501,19 @@ object *fn_ShowBMP (object *args, object *env) {
       oyy = cons(oy, NULL);
       subscripts = cons(ox, oyy);
       element = getarray(array, subscripts, env, &bit);
-      tft.writePixel(x+ax, y+ay, checkinteger(*element));
+      if (bit < 0) {
+        tft.writePixel(x+ax, y+ay, checkinteger(*element));
+      }
+      else {
+        bmpbit = abs(checkinteger(*element) & (1<<bit));
+        if (bmpbit > 0) {
+          color = monocol;
+        }
+        else {
+          color = 0;
+        }
+        tft.writePixel(x+ax, y+ay, color);
+      }
       //starttime = micros();
       //while (micros() < (starttime + 64));
 
@@ -357,8 +527,8 @@ object *fn_ShowBMP (object *args, object *env) {
 
   return nil;
 }
-
 #endif
+
 
 //USB host keyboard and mouse supported anytime
 /*
@@ -676,6 +846,172 @@ if (stringp(pattern) && stringp(target)) {
     return nil;
   } else error2("arguments are not both lists or strings");
   return nil;
+}
+
+/*
+  (rad-to-deg n)
+  Convert radians to degrees.
+*/
+object *fn_RadToDeg (object *args, object *env) {
+  (void) env;
+
+  return number(checkintfloat(first(args))*RAD_TO_DEG);
+}
+
+/*
+  (deg-to-rad n)
+  Convert degree to radians.
+*/
+object *fn_DegToRad (object *args, object *env) {
+  (void) env;
+
+  return number(checkintfloat(first(args))*DEG_TO_RAD);
+}
+
+/*
+  (vector-sub v1 v2)
+  Subtract vector v2 from vector v1 (lists with 3 elements).
+*/
+object *fn_VectorSub (object *args, object *env) {
+  (void) env;
+
+  if (!listp(first(args)) || !listp(second(args))) error2("arguments must be lists of three numbers");
+
+  float a1 = checkintfloat(car(first(args)));
+  float a2 = checkintfloat(car(cdr(first(args))));
+  float a3 = checkintfloat(car(cddr(first(args))));
+
+  float b1 = checkintfloat(car(second(args)));
+  float b2 = checkintfloat(car(cdr(second(args))));
+  float b3 = checkintfloat(car(cddr(second(args))));
+
+  return cons(number(a1-b1), cons(number(a2-b2), cons(number(a3-b3), NULL)));
+}
+
+/*
+  (vector-add v1 v2)
+  Add vector v2 to vector v1 (lists with 3 elements).
+*/
+object *fn_VectorAdd (object *args, object *env) {
+  (void) env;
+
+  if (!listp(first(args)) || !listp(second(args))) error2("arguments must be lists of three numbers");
+
+  float a1 = checkintfloat(car(first(args)));
+  float a2 = checkintfloat(car(cdr(first(args))));
+  float a3 = checkintfloat(car(cddr(first(args))));
+
+  float b1 = checkintfloat(car(second(args)));
+  float b2 = checkintfloat(car(cdr(second(args))));
+  float b3 = checkintfloat(car(cddr(second(args))));
+
+  return cons(number(a1+b1), cons(number(a2+b2), cons(number(a3+b3), NULL)));
+}
+
+/*
+  (vector-norm v)
+  Calculate magnitude/norm of vector v (list with 3 elements).
+*/
+object *fn_VectorNorm (object *args, object *env) {
+  (void) env;
+
+  if (!listp(first(args))) error2("argument must be list of three numbers");
+
+  float a1 = checkintfloat(car(first(args)));
+  float a2 = checkintfloat(car(cdr(first(args))));
+  float a3 = checkintfloat(car(cddr(first(args))));
+
+  return number(sqrt(a1*a1 + a2*a2 + a3*a3));
+}
+
+/*
+  (scalar-mult v s)
+  Multiply vector v (list with 3 elements) by number s (scalar).
+*/
+object *fn_ScalarMult (object *args, object *env) {
+  (void) env;
+
+  if (!listp(first(args))) error2("argument must be list of three numbers");
+
+  float a1 = checkintfloat(car(first(args)));
+  float a2 = checkintfloat(car(cdr(first(args))));
+  float a3 = checkintfloat(car(cddr(first(args))));
+  float s = checkintfloat(second(args));
+
+  return cons(number(a1*s), cons(number(a2*s), cons(number(a3*s), NULL)));
+}
+
+/*
+  (dot-product v1 v2)
+  Calculate dot product of two three-dimensional vectors v1, v2 (lists with 3 elements).
+*/
+object *fn_DotProduct (object *args, object *env) {
+  (void) env;
+
+  if (!listp(first(args)) || !listp(second(args))) error2("arguments must be lists of three numbers");
+
+  float a1 = checkintfloat(car(first(args)));
+  float a2 = checkintfloat(car(cdr(first(args))));
+  float a3 = checkintfloat(car(cddr(first(args))));
+
+  float b1 = checkintfloat(car(second(args)));
+  float b2 = checkintfloat(car(cdr(second(args))));
+  float b3 = checkintfloat(car(cddr(second(args))));
+
+  return number(a1*b1 + a2*b2 + a3*b3);
+}
+
+/*
+  (cross-product v1 v2)
+  Calculate cross product of two three-dimensional vectors v1, v2 (lists with 3 elements).
+*/
+object *fn_CrossProduct (object *args, object *env) {
+  (void) env;
+
+  if (!listp(first(args)) || !listp(second(args))) error2("arguments must be lists of three numbers");
+
+  float a1 = checkintfloat(car(first(args)));
+  float a2 = checkintfloat(car(cdr(first(args))));
+  float a3 = checkintfloat(car(cddr(first(args))));
+
+  float b1 = checkintfloat(car(second(args)));
+  float b2 = checkintfloat(car(cdr(second(args))));
+  float b3 = checkintfloat(car(cddr(second(args))));
+
+  float c1 = a2*b3 - a3*b2;
+  float c2 = a3*b1 - a1*b3;
+  float c3 = a1*b2 - a2*b1;
+
+  return cons(number(c1), cons(number(c2), cons(number(c3), NULL)));
+}
+
+/*
+  (vector-angle v1 v2)
+  Calculate angle (rad) between two three-dimensional vectors v1, v2 (lists with 3 elements).
+*/
+object *fn_VectorAngle (object *args, object *env) {
+  (void) env;
+
+  if (!listp(first(args)) || !listp(second(args))) error2("arguments must be lists of three numbers");
+
+  float a1 = checkintfloat(car(first(args)));
+  float a2 = checkintfloat(car(cdr(first(args))));
+  float a3 = checkintfloat(car(cddr(first(args))));
+
+  float b1 = checkintfloat(car(second(args)));
+  float b2 = checkintfloat(car(cdr(second(args))));
+  float b3 = checkintfloat(car(cddr(second(args))));
+
+  //dot product
+  float dot = (a1*b1 + a2*b2 + a3*b3);
+
+  //norms
+  float na = sqrt(a1*a1 + a2*a2 + a3*a3);
+  float nb = sqrt(b1*b1 + b2*b2 + b3*b3);
+
+  float cphi = dot/(na*nb);
+
+  return number(acos(cphi));
 }
 
 
@@ -1422,8 +1758,10 @@ object *fn_TFT1DisplayBMP (object *args, object *env) {
 }
 
 /*
-  (tft1-show-bmp arr x y)
+  (tft1-show-bmp arr x y [monocol])
   Show bitmap image contained in uLisp array arr on screen at position x y.
+  The function automatically distinguishes between monochrome and color image arrays.
+  If monocol is provided, a monochrome image is painted with that color value.
 */
 object *fn_TFT1ShowBMP (object *args, object *env) {
 
@@ -1437,11 +1775,19 @@ object *fn_TFT1ShowBMP (object *args, object *env) {
   else error2("array must be two-dimensional");
 
   int x = checkinteger(second(args));
-  int y = checkinteger(third(args));  
+  int y = checkinteger(third(args)); 
+  int monocol = 0xFFFF;
+  args = cddr(args);
+  args = cdr(args);
+  if (args != NULL) {
+    monocol = checkinteger(first(args));
+  } 
   (void) args;
 
-  int aw = first(dimensions)->integer;
-  int ah = second(dimensions)->integer;
+  int bmpbit = 0;
+  uint16_t color = 0;
+  int aw = abs(first(dimensions)->integer);
+  int ah = abs(second(dimensions)->integer);
   int bit;
   object* subscripts;
   object* ox;
@@ -1459,7 +1805,19 @@ object *fn_TFT1ShowBMP (object *args, object *env) {
       oyy = cons(oy, NULL);
       subscripts = cons(ox, oyy);
       element = getarray(array, subscripts, env, &bit);
-      linearr[ax] = checkinteger(*element);
+      if (bit < 0) {
+        linearr[ax] = checkinteger(*element);
+      }
+      else {
+        bmpbit = abs(checkinteger(*element) & (1<<bit));
+        if (bmpbit > 0) {
+          color = monocol;
+        }
+        else {
+          color = 0;
+        }
+        linearr[ax] = color;
+      }
       myfree(subscripts);
       myfree(oyy);
       myfree(oy);
@@ -1861,6 +2219,153 @@ object *fn_OledFillTriangle (object *args, object *env) {
   for (int i=0; i<6; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   oled.drawTriangle(params[0], params[1], params[2], params[3], params[4], params[5]);
   oled.sendBuffer();
+  return nil;
+}
+
+/*
+  (oled-display-bmp fname x y)
+  Open monochrome BMP file fname from SD if it exits and display it on screen at position x y (using the color set before).
+*/
+object *fn_OledDisplayBMP (object *args, object *env) {
+  (void) env;
+
+  SD.begin(SDCARD_SS_PIN);
+
+  int slength = stringlength(checkstring(first(args)))+1;
+  char *fnbuf = (char*)malloc(slength);
+  cstring(first(args), fnbuf, slength);
+  File file;
+
+  if (!SD.exists(fnbuf)) {
+    pfstring("File not found", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+  int x = checkinteger(second(args));
+  int y = checkinteger(third(args));
+  (void) args;
+
+  char buffer[BUFFERSIZE];
+  file = SD.open(fnbuf);
+  if (!file) { 
+    pfstring("Problem reading from SD card", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  char b = file.read();
+  char m = file.read();
+  if ((m != 77) || (b != 66)) {
+    pfstring("No BMP file", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  file.seek(10);
+  uint32_t offset = SDRead32(file);
+  SDRead32(file);
+  int32_t width = SDRead32(file);
+  int32_t height = SDRead32(file);
+  int linebytes = floor(width / 8);
+  int restbits = width % 8;
+  if (restbits > 0) linebytes++;
+  int zpad = 0;
+  if ((linebytes % 4) > 0) {
+    zpad = (4 - (linebytes % 4));
+  }
+
+  file.seek(28);
+  uint16_t depth = file.read();
+  if (depth > 1) { 
+    pfstring("No monochrome bitmap file", (pfun_t)pserial);
+    free(fnbuf);
+    return nil;
+  }
+
+  file.seek(offset);
+
+  int lx = 0;
+  int bmpbyte = 0;
+  int bmpbit = 0;
+
+  for (int ly = (height - 1); ly >= 0; ly--) {
+    for (int bx = 0; bx < linebytes; bx++) {
+      bmpbyte = file.read();
+      for (int bix = 0; bix < 8; bix++) {
+        lx = (bx * 8) + bix;
+        bmpbit = bmpbyte & (1 << (7-bix));
+        if (bmpbit > 0) {
+          oled.drawPixel(x+lx, y+ly);
+        }
+      }
+    }
+    //ignore trailing zero bytes
+    if (zpad > 0) {
+      for (int i = 0; i < zpad; i++) {
+        file.read();
+      }
+    }
+  }
+
+  oled.sendBuffer();
+  file.close();
+  free(fnbuf);
+  return nil;
+}
+
+/*
+  (oled-show-bmp arr x y)
+  Show bitmap image contained in uLisp array arr on screen at position x y (using color set before).
+*/
+object *fn_OledShowBMP (object *args, object *env) {
+
+  object* array = first(args);
+  if (!arrayp(array)) error2("argument is not an array");
+
+  object *dimensions = cddr(array);
+  if (listp(dimensions)) {
+    if (listlength(dimensions) != 2) error2("array must be two-dimensional");
+  }
+  else error2("array must be two-dimensional");
+
+  int x = checkinteger(second(args));
+  int y = checkinteger(third(args));
+  (void) args;
+
+  int aw = abs(first(dimensions)->integer);
+  int ah = abs(second(dimensions)->integer);
+  int bit;
+  object* subscripts;
+  object* ox;
+  object* oy;
+  object* oyy;
+  object** element;
+
+  int bmpbit = 0;
+  for (int ay = 0; ay < ah; ay++) {
+    for (int ax = 0; ax < aw; ax++) {
+      ox = number(ax);
+      oy = number(ay);
+      oyy = cons(oy, NULL);
+      subscripts = cons(ox, oyy);
+      element = getarray(array, subscripts, env, &bit);
+      if (bit < 0) {
+        error2("OLED draws monochrome image only");
+      }
+      else {
+        bmpbit = abs(checkinteger(*element) & (1<<bit));
+        if (bmpbit > 0) {
+          oled.drawPixel(x+ax, y+ay);
+        }
+      }
+      myfree(subscripts);
+      myfree(oyy);
+      myfree(oy);
+      myfree(ox);
+    }
+  }
+  oled.sendBuffer();
+
   return nil;
 }
 #endif
@@ -2389,6 +2894,7 @@ object *fn_MatrixSetRotation (object *args, object *env) {
 const char stringSetBacklight[] PROGMEM = "set-backlight";
 const char stringDisplayBMP[] PROGMEM = "display-bmp";
 const char stringLoadBMP[] PROGMEM = "load-bmp";
+const char stringLoadMono[] PROGMEM = "load-mono";
 const char stringShowBMP[] PROGMEM = "show-bmp";
 #endif
 
@@ -2397,6 +2903,18 @@ const char stringKeyboardGetKey[] PROGMEM = "keyboard-get-key";
 const char stringKeyboardFlush[] PROGMEM = "keyboard-flush";
 const char stringMouseGetValues[] PROGMEM = "mouse-get-values";
 const char stringMouseLastButtons[] PROGMEM = "mouse-last-buttons";
+
+//Vector math supported anytime
+const char stringRadToDeg[] PROGMEM = "rad-to-deg";
+const char stringDegToRad[] PROGMEM = "deg-to-rad";
+const char stringVectorSub[] PROGMEM = "vector-sub";
+const char stringVectorAdd[] PROGMEM = "vector-add";
+const char stringVectorNorm[] PROGMEM = "vector-norm";
+const char stringScalarMult[] PROGMEM = "scalar-mult";
+const char stringDotProduct[] PROGMEM = "dot-product";
+const char stringCrossProduct[] PROGMEM = "cross-product";
+const char stringVectorAngle[] PROGMEM = "vector-angle";
+
 
 //String helper function from M5Cardputer editor version by hasn0life
 const char stringSearchStr[] PROGMEM = "search-str";
@@ -2481,6 +2999,8 @@ const char stringOledFillCircle[] PROGMEM = "oled-fill-circle";
 const char stringOledDrawRoundRect[] PROGMEM = "oled-draw-round-rect";
 const char stringOledFillRoundRect[] PROGMEM = "oled-fill-round-rect";
 const char stringOledFillTriangle[] PROGMEM = "oled-fill-triangle";
+const char stringOledDisplayBMP[] PROGMEM = "oled-display-bmp";
+const char stringOledShowBMP[] PROGMEM = "oled-show-bmp";
 #endif
 
 #if defined(rfm69)
@@ -2522,8 +3042,15 @@ const char docLoadBMP[] PROGMEM = "(load-bmp fname arr [offx] [offy])\n"
 "Note that this allocates massive amounts of RAM. Use for small bitmaps/icons only.\n"
 "When the image is larger than the array, only the upper leftmost area of the bitmap fitting into the array is loaded.\n"
 "Providing offx and offy you may move the 'window' of the array to other parts of the bitmap (useful e.g. for tiling).";
-const char docShowBMP[] PROGMEM = "(show-bmp arr x y)\n"
-"Show bitmap image contained in uLisp array arr on screen at position x y.";
+const char docLoadMono[] PROGMEM = "(load-mono fname arr [offx] [offy])\n"
+"Open monochrome BMP file fname from SD if it exits and copy it into the two-dimensional uLisp bit array provided.\n"
+"Note that this allocates massive amounts of RAM. Use for small bitmaps/icons only.\n"
+"When the image is larger than the array, only the upper leftmost area of the bitmap fitting into the array is loaded.\n"
+"Providing offx and offy you may move the 'window' of the array to other parts of the bitmap (useful e.g. for tiling).";
+const char docShowBMP[] PROGMEM = "(show-bmp arr x y [monocol])\n"
+"Show bitmap image contained in uLisp array arr on screen at position x y.\n"
+"The function automatically distinguishes between monochrome and color image arrays.\n"
+"If monocol is provided, a monochrome image is painted with that color value.";
 #endif
 
 //USB host keyboard and mouse supported anytime
@@ -2535,6 +3062,26 @@ const char docMouseGetValues[] PROGMEM = "(mouse-get-values)\n"
 "Query HID mouse interface and return values relx, rely, buttons, relwheel, relwheelH as a list.";
 const char docMouseLastButtons[] PROGMEM = "(mouse-last-buttons)\n"
 "Returns last mouse button status without retrieving current values.";
+
+//Vector math supported anytime
+const char docRadToDeg[] PROGMEM = "(rad-to-deg n)\n"
+"Convert radians to degrees.";
+const char docDegToRad[] PROGMEM = "(deg-to-rad n)\n"
+"Convert degree to radians.";
+const char docVectorSub[] PROGMEM = "(vector-sub v1 v2)\n"
+"Subtract vector v2 from vector v1 (lists with 3 elements).";
+const char docVectorAdd[] PROGMEM = "(vector-add v1 v2)\n"
+"Add vector v2 to vector v1 (lists with 3 elements).";
+const char docVectorNorm[] PROGMEM = "(vector-norm v)\n"
+"Calculate magnitude/norm of vector v (list with 3 elements).";
+const char docScalarMult[] PROGMEM = "(scalar-mult v s)\n"
+"Multiply vector v (list with 3 elements) by number s (scalar).";
+const char docDotProduct[] PROGMEM = "(dot-product v1 v2)\n"
+"Calculate dot product of two three-dimensional vectors v1, v2 (lists with 3 elements).";
+const char docCrossProduct[] PROGMEM = "(cross-product v1 v2)\n"
+"Calculate cross product of two three-dimensional vectors v1, v2 (lists with 3 elements).";
+const char docVectorAngle[] PROGMEM = "(vector-angle v1 v2)\n"
+"Calculate angle (rad) between two three-dimensional vectors v1, v2 (lists with 3 elements).";
 
 //String helper function from M5Cardputer editor version by hasn0life
 const char docSearchStr[] PROGMEM = "(search-str pattern target [startpos])\n"
@@ -2638,8 +3185,10 @@ const char docTFT1FillScreen[] PROGMEM = "(tft1-fill-screen ...)\n"
 "Wrapper copied from uLisp GFX. See doc there.";
 const char docTFT1DisplayBMP[] PROGMEM = "(tft1-display-bmp fname x y)\n"
 "Opens file fname from SD if it exits and displays it on screen at position x y.";
-const char docTFT1ShowBMP[] PROGMEM = "(tft1-show-bmp arr x y)\n"
-"Show bitmap image contained in uLisp array arr on screen at position x y.";
+const char docTFT1ShowBMP[] PROGMEM = "(tft1-show-bmp arr x y [monocol])\n"
+"Show bitmap image contained in uLisp array arr on screen at position x y.\n"
+"The function automatically distinguishes between monochrome and color image arrays.\n"
+"If monocol is provided, a monochrome image is painted with that color value.";
 
 const char docTFT1WriteReg[] PROGMEM = "(tft1-write-reg reg val)\n"
 "Low-level access: Write val to register reg.";
@@ -2699,6 +3248,10 @@ const char docOledFillRoundRect[] PROGMEM = "(oled-fill-round-rect x y w h r)\n"
 "Draw filled rectangle at x y with width w and height h. Edges are rounded with radius r.";
 const char docOledFillTriangle[] PROGMEM = "(oled-fill-triangle x0 y0 x1 y1 x2 y2)\n"
 "Draw filled triangle with corners at x0/y0, x1/y1 and x2/y2.";
+const char docOledDisplayBMP[] PROGMEM = "(oled-display-bmp fname x y)\n"
+"Open monochrome BMP file fname from SD if it exits and display it on screen at position x y (using the color set before).";
+const char docOledShowBMP[] PROGMEM = "(oled-show-bmp arr x y)\n"
+"Show bitmap image contained in monochrome uLisp array arr on screen at position x y (using color set before).";
 #endif
 
 #if defined(rfm69)
@@ -2751,7 +3304,8 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
 { stringSetBacklight, fn_SetBacklight, 0211, docSetBacklight },
 { stringDisplayBMP, fn_DisplayBMP, 0233, docDisplayBMP },
 { stringLoadBMP, fn_LoadBMP, 0224, docLoadBMP },
-{ stringShowBMP, fn_ShowBMP, 0233, docShowBMP },
+{ stringLoadMono, fn_LoadMono, 0224, docLoadMono },
+{ stringShowBMP, fn_ShowBMP, 0234, docShowBMP },
 #endif
 
 { stringKeyboardGetKey, fn_KeyboardGetKey, 0201, docKeyboardGetKey },
@@ -2759,6 +3313,16 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
 { stringMouseGetValues, fn_MouseGetValues, 0200, docMouseGetValues },
 { stringMouseLastButtons, fn_MouseLastButtons, 0200, docMouseLastButtons },
 { stringSearchStr, fn_searchstr, 0224, docSearchStr },
+
+{ stringRadToDeg, fn_RadToDeg, 0211, docRadToDeg },
+{ stringDegToRad, fn_DegToRad, 0211, docDegToRad },
+{ stringVectorSub, fn_VectorSub, 0222, docVectorSub },
+{ stringVectorAdd, fn_VectorAdd, 0222, docVectorAdd },
+{ stringVectorNorm, fn_VectorNorm, 0211, docVectorNorm },
+{ stringScalarMult, fn_ScalarMult, 0222, docScalarMult },
+{ stringDotProduct, fn_DotProduct, 0222, docDotProduct },
+{ stringCrossProduct, fn_CrossProduct, 0222, docCrossProduct },
+{ stringVectorAngle, fn_VectorAngle, 0222, docVectorAngle },
 
 #if defined sdcardsupport
   { stringSDFileExists, fn_SDFileExists, 0211, docSDFileExists },
@@ -2807,7 +3371,7 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringTFT1FillCurve, fn_TFT1FillCurve, 0256, docTFT1FillCurve },
   { stringTFT1FillScreen, fn_TFT1FillScreen, 0201, docTFT1FillScreen },
   { stringTFT1DisplayBMP, fn_TFT1DisplayBMP, 0233, docTFT1DisplayBMP },
-  { stringTFT1ShowBMP, fn_TFT1ShowBMP, 0233, docTFT1ShowBMP },
+  { stringTFT1ShowBMP, fn_TFT1ShowBMP, 0234, docTFT1ShowBMP },
 
   { stringTFT1WriteReg, fn_TFT1WriteReg, 0222, docTFT1WriteReg },
   { stringTFT1ReadReg, fn_TFT1ReadReg, 0211, docTFT1ReadReg },
@@ -2840,6 +3404,8 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
   { stringOledDrawRoundRect, fn_OledDrawRoundRect, 0255, docOledDrawRoundRect },
   { stringOledFillRoundRect, fn_OledFillRoundRect, 0255, docOledFillRoundRect },
   { stringOledFillTriangle, fn_OledFillTriangle, 0266, docOledFillTriangle },
+  { stringOledDisplayBMP, fn_OledDisplayBMP, 0233, docOledDisplayBMP },
+  { stringOledShowBMP, fn_OledShowBMP, 0233, docOledShowBMP },
 #endif
 
 #if defined(rfm69)
