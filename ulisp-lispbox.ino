@@ -15,7 +15,7 @@
 // Compile options
 
 // #define resetautorun
-#define printfreespace
+// #define printfreespace
 #define serialmonitor
 // #define printgcs
 #define sdcardsupport
@@ -56,21 +56,31 @@
 #define MEMBANK
 
 #if defined(ARDUINO_TEENSY40) || defined(ARDUINO_TEENSY41)
-  #define WORKSPACESIZE 60000             /* Objects (8*bytes) */
+  #define BOARD_HAS_PSRAM
+  #if defined(BOARD_HAS_PSRAM)
+    #define WORKSPACESIZE 1900000         /* Objects (8*bytes) */
+  #else
+    #define WORKSPACESIZE 60000           /* Objects (8*bytes) */
+  #endif
+  #define CODESIZE 256                    /* Bytes */
+  #define STACKDIFF 15000
   #define LITTLEFS (960 * 1024)
   #include <LittleFS.h>
   LittleFS_Program LittleFS;
   #define FS_FILE_WRITE FILE_WRITE_BEGIN
-  #define FS_FILE_READ FILE_READ  
-  #define CODESIZE 256                    /* Bytes */
-  #define STACKDIFF 15000
+  #define FS_FILE_READ FILE_READ
   #define CPU_iMXRT1062
   #define SDCARD_SS_PIN BUILTIN_SDCARD
   #define BitOrder uint8_t
   #undef RAMFUNC
   #define RAMFUNC FASTRUN
   #undef MEMBANK
-  #define MEMBANK DMAMEM
+  #if defined(BOARD_HAS_PSRAM)
+    #define MEMBANK EXTMEM
+  #else
+    #define MEMBANK DMAMEM
+  #endif
+
   #if defined RA8875_gfx
     #define PIN_TFT1_CS 38
     #define PIN_TFT1_RST 10
@@ -261,10 +271,15 @@ char LastChar = 0;
 char LastPrint = 0;
 
 // For Teensy HID keyboard polling
+#define KB_MAX 10
+volatile bool kb_pressed = false;
 volatile uint16_t kb_pressed_k = 0;
 volatile uint8_t kb_pressed_m = 0;
-volatile uint16_t kb_released_k = 0;
-volatile uint8_t kb_released_m = 0;
+volatile uint16_t kb_last_k = 0;
+volatile uint8_t kb_last_m = 0;
+uint16_t kb_k[KB_MAX] = {0};
+uint8_t kb_m[KB_MAX] = {0};
+int kb_cnt = -1;
 
 // For Teensy HID mouse polling
 volatile uint8_t ms_buttons = 0;
@@ -7133,15 +7148,10 @@ void testescape () {
   //replace with much faster version below if your device is equipped with an extra button
   //(connected directly to a digital input of your Feather board)
 #if defined internalrepl 
-    if (kb_released_k) {
-      char temp = kb_released_k;
-      //kb_released_k = 0;
-      //kb_released_m = 0;
-      if ((temp == '~') || (temp == 27)) {
-        error2("escape!");
-        kb_released_k = 0;
-        kb_released_m = 0;
-      }
+    char temp = kb_last_k;
+    if ((temp == '~') || (temp == 27)) {
+      flush_key();
+      error2("escape!");
     }
 #endif
   //faster version - insert correct pin number and replace section above
@@ -7652,10 +7662,8 @@ int gserial () {
     } 
     #if defined internalrepl
     else {
-      if (kb_released_k) {
-        char temp = repl_translate_key(kb_released_k, kb_released_m);
-        kb_released_k = 0;
-        kb_released_m = 0;
+      if (get_key()) {
+        char temp = repl_translate_key(kb_last_k, kb_last_m);
         if ((temp != 0) && (temp !=255)) {
           ProcessKey(temp);
        }
@@ -7671,10 +7679,8 @@ int gserial () {
   WritePtr = 0;
   return '\n';
   #elif defined internalrepl
-  if (kb_released_k) {
-        char temp = repl_translate_key(kb_released_k, kb_released_m);
-        kb_released_k = 0;
-        kb_released_m = 0;
+      if (get_key()) {
+        char temp = repl_translate_key(kb_last_k, kb_last_m);
         if ((temp != 0) && (temp !=255)) {
           ProcessKey(temp);
   }
@@ -8033,17 +8039,50 @@ void ProcessKey (char c) {
 
 #if defined internalrepl
 void on_press () {
+
+  kb_pressed = true;
   kb_pressed_k = keyboard.getKey();
   kb_pressed_m = keyboard.getModifiers();
-  kb_released_k = 0;
-  kb_released_m = 0;
+
+  if (kb_cnt < (KB_MAX - 1)) {
+    kb_cnt++;
+    kb_k[kb_cnt] = kb_pressed_k;
+    kb_m[kb_cnt] = kb_pressed_m;
+  }
 }
 
 void on_release () {
-  kb_released_k = kb_pressed_k;
-  kb_released_m = kb_pressed_m;
+  kb_pressed = false;
   kb_pressed_k = 0;
   kb_pressed_m = 0;
+}
+
+bool get_key () {
+  if (kb_cnt > -1) {
+    kb_last_k = kb_k[0];
+    kb_last_m = kb_m[0];
+    for (int i = 1; i < KB_MAX; i++) {
+      kb_k[i - 1] = kb_k[i];
+      kb_m[i - 1] = kb_m[i];
+    }
+    kb_cnt--;
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
+void flush_key () {
+  kb_cnt = -1;
+  for (int i = 0; i < KB_MAX; i++) {
+    kb_k[i] = 0;
+    kb_m[i] = 0;
+  }
+
+  kb_pressed_k = 0;
+  kb_pressed_m = 0;
+  kb_pressed = false;
 }
 
 char repl_translate_key (uint16_t temp, uint8_t mod) {

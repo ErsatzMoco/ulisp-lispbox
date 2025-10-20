@@ -745,40 +745,43 @@ char translate_key (uint16_t temp, uint8_t mod) {
 }
  
 /*
-  (keyboard-get-key [pressed])
-  Get key last recognized - default: when released, if [pressed] is t: when pressed).
+  (keyboard-get-key)
+  Get key from buffer.
 */
 object *fn_KeyboardGetKey (object *args, object *env) {
-  (void) env;
-  bool check_press = false;
-  if (args != NULL) {
-    check_press = (first(args) == nil) ? false : true;
-  }
+  (void) args, (void) env;
 
-  if (!check_press) {
-    if (kb_released_k) {
-      return number(translate_key(kb_released_k, kb_released_m));
-    }
-    else return nil;
+  if (get_key()) {
+    return number(translate_key(kb_last_k, kb_last_m));
   }
   else {
-    if (kb_pressed_k) {
-      return number(translate_key(kb_pressed_k, kb_pressed_m));
-    }
-    else return nil;
+    return nil;
+  }
+}
+
+/*
+  (keyboard-key-pressed)
+  Test if key is currently pressed and not released.
+*/
+object *fn_KeyboardKeyPressed (object *args, object *env) {
+  (void) args, (void) env;
+
+  if (kb_pressed) {
+    return tee;
+  }
+  else {
+    return nil;
   }
 }
 
 /*
   (keyboard-flush)
-  Discard missing key up/down events.
+  Flush keyboard buffer (exposed from internal function).
 */
 object *fn_KeyboardFlush (object *args, object *env) {
   (void) args, (void) env;
-  kb_pressed_k = 0;
-  kb_pressed_m = 0;
-  kb_released_k = 0;
-  kb_released_m = 0;
+
+  flush_key();
 
   return nil;
 }
@@ -2900,6 +2903,7 @@ const char stringShowBMP[] PROGMEM = "show-bmp";
 
 //USB host keyboard supported anytime
 const char stringKeyboardGetKey[] PROGMEM = "keyboard-get-key";
+const char stringKeyboardKeyPressed[] PROGMEM = "keyboard-key-pressed";
 const char stringKeyboardFlush[] PROGMEM = "keyboard-flush";
 const char stringMouseGetValues[] PROGMEM = "mouse-get-values";
 const char stringMouseLastButtons[] PROGMEM = "mouse-last-buttons";
@@ -3054,10 +3058,12 @@ const char docShowBMP[] PROGMEM = "(show-bmp arr x y [monocol])\n"
 #endif
 
 //USB host keyboard and mouse supported anytime
-const char docKeyboardGetKey[] PROGMEM = "(keyboard-get-key [pressed])\n"
-"Get key last recognized - default: when released, if [pressed] is t: when pressed).";
+const char docKeyboardGetKey[] PROGMEM = "(keyboard-get-key)\n"
+"Get key from buffer.";
+const char docKeyboardKeyPressed[] PROGMEM = "(keyboard-key-pressed)\n"
+"Test if key is currently pressed and not released.";
 const char docKeyboardFlush[] PROGMEM = "(keyboard-flush)\n"
-"Discard missing key up/down events.";
+"Flush keyboard buffer.";
 const char docMouseGetValues[] PROGMEM = "(mouse-get-values)\n"
 "Query HID mouse interface and return values relx, rely, buttons, relwheel, relwheelH as a list.";
 const char docMouseLastButtons[] PROGMEM = "(mouse-last-buttons)\n"
@@ -3308,7 +3314,8 @@ const tbl_entry_t lookup_table2[] PROGMEM = {
 { stringShowBMP, fn_ShowBMP, 0234, docShowBMP },
 #endif
 
-{ stringKeyboardGetKey, fn_KeyboardGetKey, 0201, docKeyboardGetKey },
+{ stringKeyboardGetKey, fn_KeyboardGetKey, 0200, docKeyboardGetKey },
+{ stringKeyboardKeyPressed, fn_KeyboardKeyPressed, 0200, docKeyboardKeyPressed },
 { stringKeyboardFlush, fn_KeyboardFlush, 0200, docKeyboardFlush },
 { stringMouseGetValues, fn_MouseGetValues, 0200, docMouseGetValues },
 { stringMouseLastButtons, fn_MouseLastButtons, 0200, docMouseLastButtons },
