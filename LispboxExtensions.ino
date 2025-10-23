@@ -858,7 +858,7 @@ if (stringp(pattern) && stringp(target)) {
 object *fn_RadToDeg (object *args, object *env) {
   (void) env;
 
-  return number(checkintfloat(first(args))*RAD_TO_DEG);
+  return makefloat(checkintfloat(first(args))*RAD_TO_DEG);
 }
 
 /*
@@ -868,7 +868,7 @@ object *fn_RadToDeg (object *args, object *env) {
 object *fn_DegToRad (object *args, object *env) {
   (void) env;
 
-  return number(checkintfloat(first(args))*DEG_TO_RAD);
+  return makefloat(checkintfloat(first(args))*DEG_TO_RAD);
 }
 
 /*
@@ -888,7 +888,7 @@ object *fn_VectorSub (object *args, object *env) {
   float b2 = checkintfloat(car(cdr(second(args))));
   float b3 = checkintfloat(car(cddr(second(args))));
 
-  return cons(number(a1-b1), cons(number(a2-b2), cons(number(a3-b3), NULL)));
+  return cons(makefloat(a1-b1), cons(makefloat(a2-b2), cons(makefloat(a3-b3), NULL)));
 }
 
 /*
@@ -908,7 +908,7 @@ object *fn_VectorAdd (object *args, object *env) {
   float b2 = checkintfloat(car(cdr(second(args))));
   float b3 = checkintfloat(car(cddr(second(args))));
 
-  return cons(number(a1+b1), cons(number(a2+b2), cons(number(a3+b3), NULL)));
+  return cons(makefloat(a1+b1), cons(makefloat(a2+b2), cons(makefloat(a3+b3), NULL)));
 }
 
 /*
@@ -924,7 +924,7 @@ object *fn_VectorNorm (object *args, object *env) {
   float a2 = checkintfloat(car(cdr(first(args))));
   float a3 = checkintfloat(car(cddr(first(args))));
 
-  return number(sqrt(a1*a1 + a2*a2 + a3*a3));
+  return makefloat(sqrt(a1*a1 + a2*a2 + a3*a3));
 }
 
 /*
@@ -941,7 +941,7 @@ object *fn_ScalarMult (object *args, object *env) {
   float a3 = checkintfloat(car(cddr(first(args))));
   float s = checkintfloat(second(args));
 
-  return cons(number(a1*s), cons(number(a2*s), cons(number(a3*s), NULL)));
+  return cons(makefloat(a1*s), cons(makefloat(a2*s), cons(makefloat(a3*s), NULL)));
 }
 
 /*
@@ -961,7 +961,7 @@ object *fn_DotProduct (object *args, object *env) {
   float b2 = checkintfloat(car(cdr(second(args))));
   float b3 = checkintfloat(car(cddr(second(args))));
 
-  return number(a1*b1 + a2*b2 + a3*b3);
+  return makefloat(a1*b1 + a2*b2 + a3*b3);
 }
 
 /*
@@ -985,7 +985,7 @@ object *fn_CrossProduct (object *args, object *env) {
   float c2 = a3*b1 - a1*b3;
   float c3 = a1*b2 - a2*b1;
 
-  return cons(number(c1), cons(number(c2), cons(number(c3), NULL)));
+  return cons(makefloat(c1), cons(makefloat(c2), cons(makefloat(c3), NULL)));
 }
 
 /*
@@ -1006,15 +1006,15 @@ object *fn_VectorAngle (object *args, object *env) {
   float b3 = checkintfloat(car(cddr(second(args))));
 
   //dot product
-  float dot = (a1*b1 + a2*b2 + a3*b3);
+  double dot = (a1*b1 + a2*b2 + a3*b3);
 
   //norms
-  float na = sqrt(a1*a1 + a2*a2 + a3*a3);
-  float nb = sqrt(b1*b1 + b2*b2 + b3*b3);
+  double na = sqrt(a1*a1 + a2*a2 + a3*a3);
+  double nb = sqrt(b1*b1 + b2*b2 + b3*b3);
 
   float cphi = dot/(na*nb);
 
-  return number(acos(cphi));
+  return makefloat(acos(cphi));
 }
 
 
