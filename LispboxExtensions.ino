@@ -557,7 +557,7 @@ char translate_key (uint16_t temp, uint8_t mod) {
       case 90: kout = 'Y'; break;
       case 47: kout = '-'; break;
       case 92: kout = '#'; break;
-      case 61: kout = '\''; break;
+      case 61: kout = '|'; break;
 
       case 39: kout = '('; break;
       case 91: kout = ')'; break;

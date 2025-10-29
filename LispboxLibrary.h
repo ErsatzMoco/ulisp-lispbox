@@ -2885,6 +2885,490 @@ const char LispLibrary[] PROGMEM = R"lisplibrary(
 	)
 )
 
+#| uLisp Assembler |#
+#| ARM Thumb Assembler for uLisp - Version 10 - 18th November 2024 |#
+#| see http://www.ulisp.com/show?2YRU |#
+
+(defun regno (sym)
+  (case sym (sp 13) (lr 14) (pc 15)
+    (t (read-from-string (subseq (string sym) 1)))))
+
+(defun emit (bits &rest args)
+  (let ((word 0) (shift -28))
+    (mapc #'(lambda (value)
+              (let ((width (logand (ash bits shift) #xf)))
+                (incf shift 4)
+                (unless (zerop (ash value (- width))) (error "Won't fit"))
+                (setq word (logior (ash word width) value))))
+          args)
+    word))
+
+(defun offset (label) (ash (- label *pc* 4) -1))
+
+(defun $word (val)
+  (append
+   (unless (zerop (mod *pc* 4)) (list ($nop)))
+   (list (logand val #xffff) (logand (ash val -16) #xffff))))
+
+(defun lsl-lsr-0 (op argd argm immed5)
+  (emit #x41533000 0 op immed5 (regno argm) (regno argd)))
+
+(defun asr-0 (op argd argm immed5)
+  (emit #x41533000 1 op immed5 (regno argm) (regno argd)))
+
+(defun add-sub-1 (op argd argn argm)
+  (cond
+   ((numberp argm)
+    (emit #x61333000 #b000111 op argm (regno argn) (regno argd)))
+   ((null argm)
+    (emit #x61333000 #b000110 op (regno argn) (regno argd) (regno argd)))
+   (t
+    (emit #x61333000 #b000110 op (regno argm) (regno argn) (regno argd)))))
+
+(defun mov-sub-2-3 (op2 op argd immed8)
+  (emit #x41380000 op2 op (regno argd) immed8))
+
+(defun add-mov-4 (op argd argm)
+  (let ((rd (regno argd))
+        (rm (regno argm)))
+    (cond
+     ((and (>= rd 8) (>= rm 8))
+      (emit #x61333000 #b010001 op #b011 (- rm 8) (- rd 8)))
+     ((>= rm 8)
+      (emit #x61333000 #b010001 op #b001 (- rm 8) rd))
+     ((>= rd 8)
+      (emit #x61333000 #b010001 op #b010 rm (- rd 8))))))
+
+(defun reg-reg (op argd argm)
+  (emit #xa3300000 op (regno argm) (regno argd)))
+
+(defun bx-blx (op argm)
+  (emit #x81430000 #b01000111 op (regno argm) 0))
+
+(defun str-ldr (op argd arg2)
+  (cond
+   ((numberp arg2)
+    (when (= op 0) (error "str not allowed with label"))
+    (let ((arg (- (truncate (+ arg2 2) 4) (truncate *pc* 4) 1)))
+      (emit #x41380000 4 1 (regno argd) (max 0 arg))))
+   ((listp arg2)
+    (let ((argn (first arg2))
+          (immed (or (eval (second arg2)) 0)))
+      (unless (zerop (mod immed 4)) (error "not multiple of 4"))
+      (cond
+       ((eq (regno argn) 15)
+        (when (= op 0) (error "str not allowed with pc"))
+        (emit #x41380000 4 1 (regno argd) (truncate immed 4)))
+       ((eq (regno argn) 13)
+        (emit #x41380000 9 op (regno argd) (truncate immed 4)))
+       (t
+        (emit #x41533000 6 op (truncate immed 4) (regno argn) (regno argd))))))
+   (t (error "illegal argument"))))
+
+(defun str-ldr-5 (op argd arg2)
+  (cond
+   ((listp arg2)
+    (let ((argn (first arg2))
+          (argm (second arg2)))
+      (emit #x43333000 5 op (regno argm) (regno argn) (regno argd))))
+   (t (error "illegal argument"))))
+
+(defun add-10 (op argd immed8)
+  (emit #x41380000 #b1010 op (regno argd) (truncate immed8 4)))
+
+(defun add-sub-11 (op immed7)
+  (emit #x81700000 #b11010000 op (truncate immed7 4)))
+
+(defun push-pop (op lst)
+  (let ((byte 0)
+        (r 0))
+    (mapc #'(lambda (x) 
+              (cond
+               ((and (= op 0) (eq x 'lr)) (setq r 1))
+               ((and (= op 1) (eq x 'pc)) (setq r 1))
+               (t (setq byte (logior byte (ash 1 (regno x))))))) lst)
+    (emit #x41218000 11 op 2 r byte)))
+
+(defun b-cond-13 (cnd label)
+  (let ((soff8 (logand (offset label) #xff)))
+    (emit #x44800000 13 cnd soff8)))
+
+(defun cpside (op aif)
+  (emit #xb1130000 #b10110110011 op 0 aif))
+
+(defun $adc (argd argm)
+  (reg-reg #b0100000101 argd argm))
+
+(defun $add (argd argn &optional argm)
+  (cond
+   ((numberp argm)
+    (cond
+     ((eq (regno argn) 15)
+      (add-10 0 argd argm))
+     ((eq (regno argn) 13)
+      (add-10 1 argd argm))
+     (t (add-sub-1 0 argd argn argm))))
+   ((and (numberp argn) (null argm))
+    (cond
+     ((eq (regno argd) 13)
+      (add-sub-11 0 argn))
+     (t
+      (mov-sub-2-3 3 0 argd argn))))
+   (t
+    (cond
+     ((or (>= (regno argd) 8) (>= (regno argn) 8))
+      (add-mov-4 0 argd argn))
+     (t
+      (add-sub-1 0 argd argn argm))))))
+
+(defun $and (argd argm)
+  (reg-reg #b0100000000 argd argm))
+
+(defun $asr (argd argm &optional arg2)
+  (unless arg2 (setq arg2 argm argm argd))
+  (cond
+   ((numberp arg2)
+    (asr-0 0 argd argm arg2))
+   ((eq argd argm)
+    (reg-reg #b0100000100 argd arg2))
+   (t (error "First 2 registers must be the same"))))
+
+(defun $b (label)
+  (emit #x41b00000 #xe 0 (logand (offset label) #x7ff)))
+
+(defun $bcc (label)
+  (b-cond-13 3 label))
+
+(defun $bcs (label)
+  (b-cond-13 2 label))
+
+(defun $beq (label)
+  (b-cond-13 0 label))
+
+(defun $bge (label)
+  (b-cond-13 10 label))
+
+(defun $bgt (label)
+  (b-cond-13 12 label))
+
+(defun $bhi (label)
+  (b-cond-13 8 label))
+
+(defun $bhs (label)
+  (b-cond-13 2 label))
+
+(defun $ble (label)
+  (b-cond-13 13 label))
+
+(defun $blo (label)
+  (b-cond-13 3 label))
+
+(defun $blt (label)
+  (b-cond-13 11 label))
+
+(defun $bmi (label)
+  (b-cond-13 4 label))
+
+(defun $bne (label)
+  (b-cond-13 1 label))
+
+(defun $bpl (label)
+  (b-cond-13 5 label))
+
+(defun $bic (argd argm)
+  (reg-reg #b0100001110 argd argm))
+
+(defun $bl (label)
+  (list
+   (emit #x5b000000 #b11110 (logand (ash (offset label) -11) #x7ff))
+   (emit #x5b000000 #b11111 (logand (offset label) #x7ff))))
+
+(defun $blx (argm)
+  (bx-blx 1 argm))
+
+(defun $bx (argm)
+  (bx-blx 0 argm))
+
+(defun $cmn (argd argm)
+  (reg-reg #b0100001011 argd argm))
+
+(defun $cmp (argd argm)
+  (cond
+   ((numberp argm)
+    (mov-sub-2-3 2 1 argd argm))
+   (t
+    (reg-reg #b0100001010 argd argm))))
+
+(defun $cpsid (aif)
+  (cpside 1 aif))
+
+(defun $cpsie (aif)
+  (cpside 0 aif))
+    
+(defun $eor (argd argm)
+  (reg-reg #b0100000001 argd argm))
+
+(defun $ldr (argd arg2)
+  (str-ldr 1 argd arg2))
+
+(defun $ldrb (argd arg2)
+  (str-ldr-5 6 argd arg2))
+
+(defun $ldrh (argd arg2)
+  (str-ldr-5 5 argd arg2))
+
+(defun $ldrsb (argd arg2)
+  (str-ldr-5 3 argd arg2))
+
+(defun $ldrsh (argd arg2)
+  (str-ldr-5 7 argd arg2))
+
+(defun $lsl (argd argm &optional arg2)
+  (unless arg2 (setq arg2 argm argm argd))
+  (cond
+   ((numberp arg2)
+    (lsl-lsr-0 0 argd argm arg2))
+   ((eq argd argm)
+    (reg-reg #b0100000010 argd arg2))
+   (t (error "First 2 registers must be the same"))))
+
+(defun $lsr (argd argm &optional arg2)
+  (unless arg2 (setq arg2 argm argm argd))
+  (cond
+   ((numberp arg2)
+    (lsl-lsr-0 1 argd argm arg2))
+   ((eq argd argm)
+    (reg-reg #b0100000011 argd arg2))
+   (t (error "First 2 registers must be the same"))))
+
+(defun $mov (argd argm)
+  (cond
+   ((numberp argm)
+    (mov-sub-2-3 2 0 argd argm))
+   ((or (>= (regno argd) 8) (>= (regno argm) 8))
+    (add-mov-4 1 argd argm))
+   (t ; Synonym of LSLS Rd, Rm, #0
+    (lsl-lsr-0 0 argd argm 0))))
+
+(defun $mul (argd argm)
+  (reg-reg #b0100001101 argd argm))
+
+(defun $mvn (argd argm)
+  (reg-reg #b0100001111 argd argm))
+
+(defun $neg (argd argm)
+  (reg-reg #b0100001001 argd argm))
+
+(defun $nop () ; mov r8,r8
+  (add-mov-4 1 'r8 'r8))
+
+(defun $orr (argd argm)
+  (reg-reg #b0100001100 argd argm))
+
+(defun $push (lst)
+  (push-pop 0 lst))
+
+(defun $pop (lst)
+  (push-pop 1 lst))
+
+(defun $rev (argd argm)
+  (reg-reg #b1011101000 argd argm))
+
+(defun $rev16 (argd argm)
+  (reg-reg #b1011101001 argd argm))
+
+(defun $revsh (argd argm)
+  (reg-reg #b1011101010 argd argm))
+
+(defun $ror (argd argm)
+  (reg-reg #b0100000111 argd argm))
+
+(defun $sbc (argd argm)
+  (reg-reg #b0100000110 argd argm))
+
+(defun $str (argd arg2)
+  (str-ldr 0 argd arg2))
+
+(defun $strb (argd arg2)
+  (str-ldr-5 2 argd arg2))
+
+(defun $sub (argd argn &optional argm)
+  (cond
+   ((not (numberp argn))
+    (add-sub-1 1 argd argn argm))
+   ((eq (regno argd) 13)
+      (add-sub-11 1 argn))
+   (t
+    (mov-sub-2-3 3 1 argd argn))))
+
+(defun $sxtb (argd argm)
+  (reg-reg #b1011001001 argd argm))
+
+(defun $sxth (argd argm)
+  (reg-reg #b1011001000 argd argm))
+
+(defun $tst (argd argm)
+  (reg-reg #b0100001000 argd argm))
+
+(defun $uxtb (argd argm)
+  (reg-reg #b1011001011 argd argm))
+
+(defun $uxth (argd argm)
+  (reg-reg #b1011001010 argd argm))
+
+
+#| uLisp Compiler |#
+#| Lisp compiler to ARM Thumb Assembler - Version 2a - 23rd August 2024 |#
+
+(defun compile (name)
+  (if (eq (car (eval name)) 'lambda)
+      (eval (comp (cons 'defun (cons name (cdr (eval name))))))
+    (error "Not a Lisp function")))
+
+(defun comp (x &optional env)
+  (cond
+   ((null x) (type-code :boolean '(($mov 'r0 0))))
+   ((eq x t) (type-code :boolean '(($mov 'r0 1))))
+   ((symbolp x) (comp-symbol x env))
+   ((atom x) (type-code :integer (list (list '$mov ''r0 x))))
+   (t (let ((fn (first x)) (args (rest x)))
+        (case fn
+          (defun (setq *label-num* 0)
+                 (setq env (mapcar #'(lambda (x y) (cons x y)) (second args) *locals*))
+                 (comp-defun (first args) (second args) (cddr args) env))
+          (progn (comp-progn args env))
+          (if    (comp-if (first args) (second args) (third args) env))
+          (setq  (comp-setq args env))
+          (t     (comp-funcall fn args env)))))))
+
+(defun mappend (fn lst)
+  (apply #'append (mapcar fn lst)))
+
+(defun type-code (type code) (cons type code))
+
+(defun code-type (type-code) (car type-code))
+
+(defun code (type-code) (cdr type-code))
+
+(defun checktype (fn type check)
+  (unless (or (null type) (null check) (eq type check))
+    (error "Argument to '~a' must be ~a not ~a" fn check type)))
+
+(defvar *params* '(r0 r1 r2 r3))
+
+(defvar *locals* '(r4 r5 r6 r7))
+
+(defvar *label-num* 0)
+
+(defun gen-label ()
+  (read-from-string (format nil "lab~d" (incf *label-num*))))
+
+(defun comp-symbol (x env)
+  (let ((reg (cdr (assoc x env))))
+    (type-code nil (list (list '$mov ''r0 (list 'quote reg))))))
+
+(defun comp-setq (args env)
+  (let ((value (comp (second args) env))
+        (reg (cdr (assoc (first args) env))))
+    (type-code 
+     (code-type value) 
+     (append (code value) (list (list '$mov (list 'quote reg) ''r0))))))
+
+(defun comp-defun (name args body env)
+  (let ((used (subseq *locals* 0 (length args))))
+    (append 
+     (list 'defcode name args)
+     (list name (list '$push (list 'quote (cons 'lr (reverse used)))))
+     (apply #'append 
+            (mapcar #'(lambda (x y) (list (list '$mov (list 'quote x) (list 'quote y))))
+                    used *params*))
+     (code (comp-progn body env))
+     (list (list '$pop (list 'quote (append used (list 'pc))))))))
+
+(defun comp-progn (exps env)
+  (let* ((len (1- (length exps)))
+         (nlast (subseq exps 0 len))
+         (last1 (nth len exps))
+         (start (mappend #'(lambda (x) (append (code (comp x env)))) nlast))
+         (end (comp last1 env)))
+    (type-code (code-type end) (append start (code end)))))
+
+(defun comp-if (pred then else env)
+  (let ((lab1 (gen-label))
+        (lab2 (gen-label))
+        (test (comp pred env)))
+    (checktype 'if (car test) :boolean)
+    (type-code :integer
+               (append
+                (code test) (list '($cmp 'r0 0) (list '$beq lab1))
+                (code (comp then env)) (list (list '$b lab2) lab1)
+                (code (comp else env)) (list lab2)))))
+
+(defun comp-funcall (f args env)
+  (let ((test (assoc f '((> . $bgt) (>= . $bge) (= . $beq) 
+                         (<= . $ble) (< . $blt) (/= . $bne))))
+        (logical (assoc f '((and . $and) (or . $orr))))
+        (arith1 (assoc f '((1+ . $add) (1- . $sub))))
+        (arith+- (assoc f '((+ . $add) (- . $sub))))
+        (arith2 (assoc f '((* . $mul) (logand . $and) (logior . $orr) (logxor . $eor)))))
+    (cond
+     (test
+      (let ((label (gen-label)))
+        (type-code :boolean
+                   (append
+                    (comp-args f args 2 :integer env)
+                    (list '($pop '(r1)) '($mov 'r2 1) '($cmp 'r1 'r0) 
+                          (list (cdr test) label) '($mov 'r2 0) label '($mov 'r0 'r2))))))
+     (logical 
+      (type-code :boolean
+                 (append
+                  (comp-args f args 2 :boolean env)
+                  (list '($pop '(r1)) (list (cdr logical) ''r0 ''r1)))))
+     (arith1
+      (type-code :integer 
+                 (append
+                  (comp-args f args 1 :integer env)
+                  (list (list (cdr arith1) ''r0 1)))))
+     (arith+-
+      (type-code :integer 
+                 (append
+                  (comp-args f args 2 :integer env)
+                  (list '($pop '(r1)) (list (cdr arith+-) ''r0 ''r1 ''r0)))))
+     (arith2
+      (type-code :integer 
+                 (append
+                  (comp-args f args 2 :integer env)
+                  (list '($pop '(r1)) (list (cdr arith2) ''r0 ''r1)))))
+     ((member f '(car cdr))
+      (type-code :integer
+                 (append
+                  (comp-args f args 1 :integer env)
+                  (if (eq f 'cdr) (list '($ldr 'r0 '(r0 4)))
+                    (list '($ldr 'r0 '(r0 0)) '($ldr 'r0 '(r0 4)))))))
+     (t ; function call
+      (type-code :integer 
+                 (append
+                  (comp-args f args nil :integer env)
+                  (when (> (length args) 1)
+                    (append
+                     (list (list '$mov (list 'quote (nth (1- (length args)) *params*)) ''r0))
+                     (mappend
+                      #'(lambda (x) (list (list '$pop (list 'quote (list x)))))
+                      (reverse (subseq *params* 0 (1- (length args)))))))
+                  (list (list '$bl f))))))))
+
+(defun comp-args (fn args n type env)
+  (unless (or (null n) (= (length args) n))
+    (error "Incorrect number of arguments to '~a'" fn))
+  (let ((n (length args)))
+    (mappend #'(lambda (y)
+                 (let ((c (comp y env)))
+                   (decf n)
+                   (checktype fn type (code-type c))
+                   (if (zerop n) (code c) (append (code c) '(($push '(r0)))))))
+             args)))
+
+
 (backtrace)
 
 )lisplibrary";

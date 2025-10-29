@@ -56,7 +56,7 @@
 #define MEMBANK
 
 #if defined(ARDUINO_TEENSY40) || defined(ARDUINO_TEENSY41)
-  #define BOARD_HAS_PSRAM
+  // #define BOARD_HAS_PSRAM
   #if defined(BOARD_HAS_PSRAM)
     #define WORKSPACESIZE 1900000         /* Objects (8*bytes) */
   #else
@@ -7147,12 +7147,13 @@ void testescape () {
   //local escape using "escape" key
   //replace with much faster version below if your device is equipped with an extra button
   //(connected directly to a digital input of your Feather board)
-#if defined internalrepl 
-    char temp = kb_last_k;
-    if ((temp == '~') || (temp == 27)) {
-      flush_key();
-      error2("escape!");
-    }
+#if defined internalrepl
+  char temp = kb_last_k;
+  if ((temp == '~') || (temp == 27)) {
+    flush_key();
+    error2("escape!");
+  }
+    
 #endif
   //faster version - insert correct pin number and replace section above
   // if (digitalRead(0) == LOW) {
@@ -7954,6 +7955,8 @@ void Display (char c) {
     tft1.graphicsMode();
     tft1.scrollY((Leading * Scroll) - 1);
     tft1.textMode();
+    flush_key();
+    kb_last_k = 0;
   } else if (c == '\n') {          // Newline
     column = 0;
     if (line == LastLine) {
@@ -8089,6 +8092,7 @@ char repl_translate_key (uint16_t temp, uint8_t mod) {
 
   #if defined(qwertz)
     char kout = 0;
+
     switch (temp) {
       case 27: kout = 12; break; // translate ESC key to clear screen
       
@@ -8111,7 +8115,7 @@ char repl_translate_key (uint16_t temp, uint8_t mod) {
       case 122: kout = 'y'; break;
       case 47: kout = '-'; break;
       case 92: kout = '#'; break;
-      case 61: kout = '`'; break;
+      case 61: kout = '|'; break;
 
       case 39: kout = '('; break;
       case 91: kout = ')'; break;
