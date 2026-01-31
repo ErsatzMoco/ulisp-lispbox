@@ -873,95 +873,118 @@ object *fn_DegToRad (object *args, object *env) {
 
 /*
   (vector-sub v1 v2)
-  Subtract vector v2 from vector v1 (lists with 3 elements).
+  Subtract vector v2 from vector v1 (two lists of number elements).
 */
 object *fn_VectorSub (object *args, object *env) {
   (void) env;
 
-  if (!listp(first(args)) || !listp(second(args))) error2("arguments must be lists of three numbers");
+  object *v1 = first(args);
+  object *v2 = second(args);
+  if (!listp(v1) || !listp(v2)) error2("arguments must be two lists of numbers");
 
-  float a1 = checkintfloat(car(first(args)));
-  float a2 = checkintfloat(car(cdr(first(args))));
-  float a3 = checkintfloat(car(cddr(first(args))));
+  object *retlist = NULL;
+  float a, b = 0;
 
-  float b1 = checkintfloat(car(second(args)));
-  float b2 = checkintfloat(car(cdr(second(args))));
-  float b3 = checkintfloat(car(cddr(second(args))));
+  while ((v1 != NULL) && (v2 != NULL)) {
+    a = checkintfloat(car(v1));
+    b = checkintfloat(car(v2));
+    retlist = cons(makefloat(a-b), retlist);
+    v1 = cdr(v1);
+    v2 = cdr(v2);
+  }
 
-  return cons(makefloat(a1-b1), cons(makefloat(a2-b2), cons(makefloat(a3-b3), NULL)));
+  return fn_reverse(cons(retlist, NULL), NULL);
 }
 
 /*
   (vector-add v1 v2)
-  Add vector v2 to vector v1 (lists with 3 elements).
+  Add vector v2 to vector v1 (two lists of number elements).
 */
 object *fn_VectorAdd (object *args, object *env) {
   (void) env;
 
-  if (!listp(first(args)) || !listp(second(args))) error2("arguments must be lists of three numbers");
+  object *v1 = first(args);
+  object *v2 = second(args);
+  if (!listp(v1) || !listp(v2)) error2("arguments must be two lists of numbers");
 
-  float a1 = checkintfloat(car(first(args)));
-  float a2 = checkintfloat(car(cdr(first(args))));
-  float a3 = checkintfloat(car(cddr(first(args))));
+  object *retlist = NULL;
+  float a, b = 0;
 
-  float b1 = checkintfloat(car(second(args)));
-  float b2 = checkintfloat(car(cdr(second(args))));
-  float b3 = checkintfloat(car(cddr(second(args))));
+  while ((v1 != NULL) && (v2 != NULL)) {
+    a = checkintfloat(car(v1));
+    b = checkintfloat(car(v2));
+    retlist = cons(makefloat(a+b), retlist);
+    v1 = cdr(v1);
+    v2 = cdr(v2);
+  }
 
-  return cons(makefloat(a1+b1), cons(makefloat(a2+b2), cons(makefloat(a3+b3), NULL)));
+  return fn_reverse(cons(retlist, NULL), NULL);
 }
 
 /*
   (vector-norm v)
-  Calculate magnitude/norm of vector v (list with 3 elements).
+  Calculate magnitude/norm of vector v (list of number elements).
 */
 object *fn_VectorNorm (object *args, object *env) {
   (void) env;
 
-  if (!listp(first(args))) error2("argument must be list of three numbers");
+  object *v1 = first(args);
+  if (!listp(v1)) error2("argument must be a list");
 
-  float a1 = checkintfloat(car(first(args)));
-  float a2 = checkintfloat(car(cdr(first(args))));
-  float a3 = checkintfloat(car(cddr(first(args))));
+  float a, sum = 0;
+  while (v1 != NULL) {
+    a = checkintfloat(car(v1));
+    sum = sum + (a*a);
+    v1 = cdr(v1);
+  }  
 
-  return makefloat(sqrt(a1*a1 + a2*a2 + a3*a3));
+  return makefloat(sqrt(sum));
 }
 
 /*
   (scalar-mult v s)
-  Multiply vector v (list with 3 elements) by number s (scalar).
+  Multiply vector v (list of number elements) by number s (scalar).
 */
 object *fn_ScalarMult (object *args, object *env) {
   (void) env;
 
-  if (!listp(first(args))) error2("argument must be list of three numbers");
-
-  float a1 = checkintfloat(car(first(args)));
-  float a2 = checkintfloat(car(cdr(first(args))));
-  float a3 = checkintfloat(car(cddr(first(args))));
+  object *v1 = first(args);
+  if (!listp(v1)) error2("first argument must be a list");
   float s = checkintfloat(second(args));
 
-  return cons(makefloat(a1*s), cons(makefloat(a2*s), cons(makefloat(a3*s), NULL)));
+  object *retlist = NULL;
+  float a;
+  while (v1 != NULL) {
+    a = checkintfloat(car(v1));
+    retlist = cons(makefloat(a*s), retlist);
+    v1 = cdr(v1);
+  }
+
+  return fn_reverse(cons(retlist, NULL), NULL);
 }
 
 /*
   (dot-product v1 v2)
-  Calculate dot product of two three-dimensional vectors v1, v2 (lists with 3 elements).
+  Calculate dot product of two vectors v1, v2 (lists of number elements).
 */
 object *fn_DotProduct (object *args, object *env) {
   (void) env;
 
-  if (!listp(first(args)) || !listp(second(args))) error2("arguments must be lists of three numbers");
+  object *v1 = first(args);
+  object *v2 = second(args);
+  if (!listp(v1) || !listp(v2)) error2("arguments must be two lists of numbers");
 
-  float a1 = checkintfloat(car(first(args)));
-  float a2 = checkintfloat(car(cdr(first(args))));
-  float a3 = checkintfloat(car(cddr(first(args))));
+  float a, b, sum;
 
-  float b1 = checkintfloat(car(second(args)));
-  float b2 = checkintfloat(car(cdr(second(args))));
-  float b3 = checkintfloat(car(cddr(second(args))));
+  while ((v1 != NULL) && (v2 != NULL)) {
+    a = checkintfloat(car(v1));
+    b = checkintfloat(car(v2));
+    sum = sum + a*b;
+    v1 = cdr(v1);
+    v2 = cdr(v2);
+  }
 
-  return makefloat(a1*b1 + a2*b2 + a3*b3);
+  return makefloat(sum);
 }
 
 /*

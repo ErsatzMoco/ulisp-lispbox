@@ -56,7 +56,7 @@
 #define MEMBANK
 
 #if defined(ARDUINO_TEENSY40) || defined(ARDUINO_TEENSY41)
-  // #define BOARD_HAS_PSRAM
+  //#define BOARD_HAS_PSRAM
   #if defined(BOARD_HAS_PSRAM)
     #define WORKSPACESIZE 1900000         /* Objects (8*bytes) */
   #else
