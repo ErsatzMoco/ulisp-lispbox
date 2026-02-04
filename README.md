@@ -10,16 +10,23 @@ The editor features full SD card support, direct binding to uLisp symbols, full 
 * CTRL-q / CTRL-c --- quit editor and return to REPL
 * CTRL-x / CTRL-b / CTRL-n --- discard current text buffer (i.e. new file)
 
-* CTRL-k / CTRL-l / ALT-x --- delete line starting at cursor position (deleted part is copied before)
-* ALT-c --- copy current line
+* CTRL-k / CTRL-l / ALT-x --- delete line starting at cursor position (deleted part is copied before). If a selection exists, the selected line range will be copied and then be deleted.
+* ALT-c --- copy current line or selected line range
 * ALT-v --- insert copy buffer at cursor position
 
-**Note:** ALT-v also serves as a rudimentary undo. If you accidentally delete part of a line using CTRL-k, CTRL-l or ALT-x you can insert that part again using ALT-v. 
+**Note:** ALT-v also serves as a rudimentary undo. If you accidentally delete part of a line or a selected line range using CTRL-k, CTRL-l or ALT-x you can insert that part again using ALT-v. 
 
 * CTRL-a / HOME --- move cursor to start of line
 * CTRL-e / END --- move cursor to end of line
 * ^ --- move cursor to beginning of buffer
 * PG UP/PG DOWN --- move one page up or down
+
+* CTRL-r --- **NEW** execute code of current line in editor immediately. If a selection exists, the selected line range will be enclosed in "(progn [...])" behind the scenes and then be executed immediately. See also "F5".
+* CTRL-s --- **NEW** search downwards for provided string in buffer starting at cursor position. When found, the cursor jumps to the related text position.
+
+* CTRL-i --- **NEW**  set start line of selection for copy/paste/delete/execute
+* CTRL-o --- **NEW**  set end line of selection for copy/paste/delete/execute
+* CTRL-p --- **NEW**  unselect selected line range
 
 * F1 --- toggle bracket matching on/off
 * F2 --- check whether bracket under the cursor has a matching bracket in the buffer. If so, both are temporarily highlighted. (Use when continuous bracket matching is off.)
